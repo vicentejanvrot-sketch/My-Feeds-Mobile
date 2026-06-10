@@ -1,15 +1,15 @@
 # Daily Agent Digest
 
-## Your AI-Powered YouTube Research Assistant
+## Your AI-Powered Research Assistant
 
-Daily Agent Digest keeps you on top of the YouTube channels that matter — without the endless scrolling. Set up AI agents to monitor your favorite channels, and let them surface what's actually worth watching.
+Daily Agent Digest keeps you on top of the videos that matter — without the endless scrolling. Set up AI agents to monitor your favorite channels, and let them surface what's actually worth watching.
 
 ---
 
 ## What It Does
 
-### Monitor YouTube Channels Automatically
-Create AI research agents, assign them YouTube channels, and they'll scan for new videos on a schedule. No manual checking — your agents do the work.
+### Monitor Channels Automatically
+Create AI research agents, assign channels, and they'll scan for new videos on a schedule. No manual checking — your agents do the work.
 
 ### Build a Smart Research Feed
 Every new video your agents discover lands in your Feed. Mark videos as Watched, Liked, or Watch Later to stay organized. A progress bar on each feed shows how much you've worked through.
@@ -77,10 +77,10 @@ Questions, feedback, or issues? Contact us at **support@travelone.ca**.
 
 This TestFlight build is a beta release. Here's what we'd love your feedback on:
 
-- Agent creation and YouTube channel monitoring.
+- Agent creation and channel monitoring.
 - Video playback quality and speed controls.
 - Feed browsing and filtering.
-- YouTube account connection and syncing.
+- Account connection and syncing.
 - Watch time statistics accuracy.
 - Overall app performance and stability.
 
