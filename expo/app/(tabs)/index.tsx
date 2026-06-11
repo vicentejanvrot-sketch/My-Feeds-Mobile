@@ -41,6 +41,7 @@ import {
   useStartRun,
   useDeleteAgent,
   useRealtimeInvalidation,
+  useAgentItemCounts,
   getAgentColor,
   qk,
 } from "@/lib/hooks";
@@ -93,6 +94,9 @@ export default function DashboardScreen() {
       ),
     [listUnsorted],
   );
+  const agentIds = useMemo(() => list.map((a) => a.id), [list]);
+  const agentCounts = useAgentItemCounts(agentIds);
+
   const runList = runs.data ?? [];
   const itemList = items.data ?? [];
   const channelList = channels.data ?? [];
@@ -255,7 +259,8 @@ export default function DashboardScreen() {
     [deleteAgent, showToast],
   );
 
-  const loading = agents.isLoading || runs.isLoading || items.isLoading || channels.isLoading;
+  const loading =
+    agents.isLoading || runs.isLoading || items.isLoading || channels.isLoading || agentCounts.isLoading;
 
   return (
     <View style={styles.root}>
@@ -353,7 +358,7 @@ export default function DashboardScreen() {
           ) : (
             list.map((agent, i) => {
               const accent = getAgentColor(i);
-              const stats = perAgentItems[agent.id] ?? { total: 0, watched: 0, unwatched: 0, watchLater: 0, liked: 0 };
+              const stats = agentCounts.data?.[agent.id] ?? { total: 0, watched: 0, unwatched: 0, watchLater: 0, liked: 0 };
               const pct = stats.total > 0 ? Math.round((stats.watched / stats.total) * 100) : 0;
               const allCaughtUp = stats.total > 0 && stats.unwatched === 0;
               return (

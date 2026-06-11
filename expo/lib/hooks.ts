@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useEffect, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Linking } from "react-native";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth-provider";
@@ -221,6 +221,7 @@ export function useUpdateItemStatus() {
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["items"] });
       void queryClient.invalidateQueries({ queryKey: ["feedItems"] });
+      void queryClient.invalidateQueries({ queryKey: ["agentItemCounts"] });
     },
   });
 }
@@ -669,6 +670,86 @@ export function useUpdateChannelPriority() {
     },
     onSettled: () => {
       void queryClient.invalidateQueries({ queryKey: ["channels"] });
+    },
+  });
+}
+
+/**
+ * Per-agent item counts using server-side exact counts (head: true).
+ * Returns a map of agentId → { total, watched, unwatched, watchLater, liked }
+ * without downloading any row data to the client.
+ */
+export function useAgentItemCounts(agentIds: string[]) {
+  const { user } = useAuth();
+  const sorted = useMemo(() => [...agentIds].sort(), [agentIds]);
+  return useQuery({
+    queryKey: ["agentItemCounts", ...sorted],
+    enabled: !!user && agentIds.length > 0,
+    staleTime: 30_000,
+    queryFn: async (): Promise<
+      Record<
+        string,
+        {
+          total: number;
+          watched: number;
+          unwatched: number;
+          watchLater: number;
+          liked: number;
+        }
+      >
+    > => {
+      const results: Record<
+        string,
+        {
+          total: number;
+          watched: number;
+          unwatched: number;
+          watchLater: number;
+          liked: number;
+        }
+      > = {};
+
+      await Promise.all(
+        agentIds.map(async (agentId) => {
+          const [totalRes, watchedRes, unwatchedRes, watchLaterRes, likedRes] =
+            await Promise.all([
+              supabase
+                .from("items")
+                .select("*", { count: "exact", head: true })
+                .eq("agent_id", agentId),
+              supabase
+                .from("items")
+                .select("*", { count: "exact", head: true })
+                .eq("agent_id", agentId)
+                .eq("user_status", "watched"),
+              supabase
+                .from("items")
+                .select("*", { count: "exact", head: true })
+                .eq("agent_id", agentId)
+                .or("user_status.is.null,user_status.eq.not_watched"),
+              supabase
+                .from("items")
+                .select("*", { count: "exact", head: true })
+                .eq("agent_id", agentId)
+                .eq("user_status", "watch_later"),
+              supabase
+                .from("items")
+                .select("*", { count: "exact", head: true })
+                .eq("agent_id", agentId)
+                .eq("user_status", "liked"),
+            ]);
+
+          results[agentId] = {
+            total: totalRes.count ?? 0,
+            watched: watchedRes.count ?? 0,
+            unwatched: unwatchedRes.count ?? 0,
+            watchLater: watchLaterRes.count ?? 0,
+            liked: likedRes.count ?? 0,
+          };
+        }),
+      );
+
+      return results;
     },
   });
 }
