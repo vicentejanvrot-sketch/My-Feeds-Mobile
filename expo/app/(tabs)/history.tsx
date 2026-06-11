@@ -111,7 +111,7 @@ export default function HistoryScreen() {
   const handleDeleteAll = () => {
     Alert.alert(
       "Delete Run History",
-      "This will permanently delete the run history shown here. This cannot be undone.",
+      "This clears the Run History list only. Your videos, feed, and statistics are kept. This cannot be undone.",
       [
         { text: "Cancel", style: "cancel" },
         {
