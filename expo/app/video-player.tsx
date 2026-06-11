@@ -289,14 +289,10 @@ export default function VideoPlayerScreen() {
   const embeddedWidth = Math.min(windowWidth, PLAYER_MAX_WIDTH);
   const embeddedHeight = Math.round(embeddedWidth * 9 / 16);
 
-  // Fullscreen player sizing — always fill the screen as a landscape rectangle.
-  // On iPad the OS may refuse orientation lock (supportsTablet), so we compute
-  // long/short edges from the current window and rotate in software when needed.
-  const longEdge = Math.max(windowWidth, windowHeight);
-  const shortEdge = Math.min(windowWidth, windowHeight);
-  const isPortraitWindow = windowHeight >= windowWidth;
-  const landscapeWidth = longEdge;
-  const landscapeHeight = shortEdge;
+  // Fullscreen player sizing — fill the actual screen; the YouTube embed
+  // letterboxes its 16:9 video inside, staying upright in any orientation.
+  const fullscreenWidth = windowWidth;
+  const fullscreenHeight = windowHeight;
 
   const handleClose = useCallback(() => {
     router.back();
@@ -635,19 +631,16 @@ export default function VideoPlayerScreen() {
             style={[
               styles.fullscreenPlayerInner,
               {
-                width: landscapeWidth,
-                height: landscapeHeight,
-              },
-              isFullscreen && isPortraitWindow && {
-                transform: [{ rotate: "90deg" }],
+                width: fullscreenWidth,
+                height: fullscreenHeight,
               },
             ]}
           >
             <VideoPlayerContent
               ref={playerRef}
               videoId={videoIdStr}
-              width={landscapeWidth}
-              height={landscapeHeight}
+              width={fullscreenWidth}
+              height={fullscreenHeight}
               playbackRate={playbackRate}
               onReady={() => {
                 setReady(true);
