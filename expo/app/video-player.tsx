@@ -163,9 +163,14 @@ export default function VideoPlayerScreen() {
   const enterFullscreen = useCallback(async () => {
     setIsFullscreen(true);
     if (Platform.OS !== "web") {
-      await ScreenOrientation.lockAsync(
-        ScreenOrientation.OrientationLock.LANDSCAPE,
-      );
+      // Best-effort orientation lock — iPad ignores this when supportsTablet is true
+      try {
+        await ScreenOrientation.lockAsync(
+          ScreenOrientation.OrientationLock.LANDSCAPE,
+        );
+      } catch {
+        // iPad rejects the lock — the fullscreen overlay still shows correctly
+      }
     } else {
       await playerRef.current?.requestFullscreen();
     }
@@ -174,7 +179,11 @@ export default function VideoPlayerScreen() {
   const exitFullscreen = useCallback(async () => {
     setIsFullscreen(false);
     if (Platform.OS !== "web") {
-      await ScreenOrientation.unlockAsync();
+      try {
+        await ScreenOrientation.unlockAsync();
+      } catch {
+        // ignore — orientation lock may not be active
+      }
     } else {
       // Try the player's own exit first, then fall back to the browser API
       try {
@@ -245,7 +254,11 @@ export default function VideoPlayerScreen() {
   useEffect(() => {
     return () => {
       if (Platform.OS !== "web") {
-        ScreenOrientation.unlockAsync();
+        try {
+          ScreenOrientation.unlockAsync();
+        } catch {
+          // ignore
+        }
       }
       if (overlayTimerRef.current) {
         clearTimeout(overlayTimerRef.current);
@@ -275,6 +288,14 @@ export default function VideoPlayerScreen() {
   // Embedded (non-fullscreen) player sizing — 16:9 with a sensible max width
   const embeddedWidth = Math.min(windowWidth, PLAYER_MAX_WIDTH);
   const embeddedHeight = Math.round(embeddedWidth * 9 / 16);
+
+  // Fullscreen player sizing — 16:9 that fits the current window (iPad may stay portrait)
+  const fullscreenByWidth = Math.round(windowWidth / (16 / 9));
+  const fullscreenByHeight = Math.round(windowHeight * (16 / 9));
+  const fullscreenPlayerWidth =
+    fullscreenByWidth <= windowHeight ? windowWidth : fullscreenByHeight;
+  const fullscreenPlayerHeight =
+    fullscreenByWidth <= windowHeight ? fullscreenByWidth : windowHeight;
 
   const handleClose = useCallback(() => {
     router.back();
@@ -607,39 +628,79 @@ export default function VideoPlayerScreen() {
             <ActivityIndicator size="large" color={Colors.accent} />
           </View>
         )}
-        <VideoPlayerContent
-          ref={playerRef}
-          videoId={videoIdStr}
-          height={isFullscreen ? Math.max(windowWidth, windowHeight) : embeddedHeight}
-          playbackRate={playbackRate}
-          onReady={() => {
-            setReady(true);
-            // Cancel any pending error timer — player is ready
-            if (errorTimerRef.current) {
-              clearTimeout(errorTimerRef.current);
-              errorTimerRef.current = null;
-            }
-            setLoadError(false);
-            // Re-apply the persisted speed on a freshly loaded video
-            const rate = Number(speed);
-            if (rate !== 1 && playerRef.current) {
-              playerRef.current.inject(
-                `(function(){try{var f=document.getElementsByTagName('iframe');for(var i=0;i<f.length;i++){if((f[i].src||'').indexOf('youtube.com')!==-1){f[i].contentWindow.postMessage(JSON.stringify({event:'command',func:'setPlaybackRate',args:[${rate}]}),'*');break;}}}catch(e){}})();`,
-              );
-            }
-          }}
-          onError={() => {
-            // Debounce: only show error if player doesn't recover within 4 seconds
-            if (errorTimerRef.current) {
-              clearTimeout(errorTimerRef.current);
-            }
-            errorTimerRef.current = setTimeout(() => {
-              errorTimerRef.current = null;
-              setLoadError(true);
-            }, 4000);
-          }}
-          onChangeState={handleStateChange}
-        />
+        {isFullscreen ? (
+          <View
+            style={[
+              styles.fullscreenPlayerInner,
+              {
+                width: fullscreenPlayerWidth,
+                height: fullscreenPlayerHeight,
+              },
+            ]}
+          >
+            <VideoPlayerContent
+              ref={playerRef}
+              videoId={videoIdStr}
+              height={fullscreenPlayerHeight}
+              playbackRate={playbackRate}
+              onReady={() => {
+                setReady(true);
+                if (errorTimerRef.current) {
+                  clearTimeout(errorTimerRef.current);
+                  errorTimerRef.current = null;
+                }
+                setLoadError(false);
+                const rate = Number(speed);
+                if (rate !== 1 && playerRef.current) {
+                  playerRef.current.inject(
+                    `(function(){try{var f=document.getElementsByTagName('iframe');for(var i=0;i<f.length;i++){if((f[i].src||'').indexOf('youtube.com')!==-1){f[i].contentWindow.postMessage(JSON.stringify({event:'command',func:'setPlaybackRate',args:[${rate}]}),'*');break;}}}catch(e){}})();`,
+                  );
+                }
+              }}
+              onError={() => {
+                if (errorTimerRef.current) {
+                  clearTimeout(errorTimerRef.current);
+                }
+                errorTimerRef.current = setTimeout(() => {
+                  errorTimerRef.current = null;
+                  setLoadError(true);
+                }, 4000);
+              }}
+              onChangeState={handleStateChange}
+            />
+          </View>
+        ) : (
+          <VideoPlayerContent
+            ref={playerRef}
+            videoId={videoIdStr}
+            height={embeddedHeight}
+            playbackRate={playbackRate}
+            onReady={() => {
+              setReady(true);
+              if (errorTimerRef.current) {
+                clearTimeout(errorTimerRef.current);
+                errorTimerRef.current = null;
+              }
+              setLoadError(false);
+              const rate = Number(speed);
+              if (rate !== 1 && playerRef.current) {
+                playerRef.current.inject(
+                  `(function(){try{var f=document.getElementsByTagName('iframe');for(var i=0;i<f.length;i++){if((f[i].src||'').indexOf('youtube.com')!==-1){f[i].contentWindow.postMessage(JSON.stringify({event:'command',func:'setPlaybackRate',args:[${rate}]}),'*');break;}}}catch(e){}})();`,
+                );
+              }
+            }}
+            onError={() => {
+              if (errorTimerRef.current) {
+                clearTimeout(errorTimerRef.current);
+              }
+              errorTimerRef.current = setTimeout(() => {
+                errorTimerRef.current = null;
+                setLoadError(true);
+              }, 4000);
+            }}
+            onChangeState={handleStateChange}
+          />
+        )}
 
         {/* Fullscreen close button */}
         {isFullscreen && (
@@ -941,6 +1002,11 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: Colors.black,
     zIndex: 100,
+    overflow: "hidden",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  fullscreenPlayerInner: {
     overflow: "hidden",
   },
   fullscreenCloseBtn: {
