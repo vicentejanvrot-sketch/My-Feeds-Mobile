@@ -13,7 +13,7 @@ import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { Play, Clock, Tags, Mail, Zap } from "lucide-react-native";
+import { Play, Clock, Tags, Mail } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { agentAccent } from "@/lib/database";
@@ -171,8 +171,8 @@ export default function AgentsScreen() {
               end={{ x: 1, y: 0 }}
               style={StyleSheet.absoluteFill}
             />
-            <Zap size={15} color={pendingId === "all" ? "rgba(255,255,255,0.5)" : Colors.white} fill={pendingId === "all" ? "rgba(255,255,255,0.5)" : Colors.white} />
-            <Text style={[styles.runAllText, pendingId === "all" && styles.disabledText]}>Run All</Text>
+            <Play size={14} color={Colors.white} fill={Colors.white} />
+            <Text style={styles.runAllText}>Run All</Text>
           </Pressable>
         ) : null}
       </View>
