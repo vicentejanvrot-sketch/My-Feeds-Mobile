@@ -7,7 +7,6 @@ import {
   RefreshControl,
   StyleSheet,
   Text,
-  useWindowDimensions,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -99,12 +98,8 @@ function fmtCount(n: number | null | undefined): string {
 
 // ── Screen ────────────────────────────────────────────────────────
 
-const IPAD_BREAKPOINT = 768;
-
 export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
-  const { width: windowWidth } = useWindowDimensions();
-  const isWide = windowWidth >= IPAD_BREAKPOINT;
   const router = useRouter();
   const toast = useToast();
 
@@ -168,7 +163,7 @@ export default function HistoryScreen() {
   }, [allChannels.data]);
 
   return (
-    <View style={[styles.root, isWide && styles.rootWide, { paddingTop: insets.top + 12 }]}>
+    <View style={[styles.root, { paddingTop: insets.top + 12 }]}>
       <View style={styles.header}>
         <History size={26} color={Colors.accent} />
         <View style={styles.headerText}>
@@ -455,7 +450,7 @@ export default function HistoryScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: Colors.background },
-  rootWide: { alignItems: "center" },
+
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -472,7 +467,7 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 14, color: Colors.textSecondary },
 
   // List
-  list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40, maxWidth: 720, width: "100%", alignSelf: "center" },
+  list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40, maxWidth: 720, alignSelf: "center" },
   listEmpty: { flex: 1, justifyContent: "center" },
 
   // Empty
