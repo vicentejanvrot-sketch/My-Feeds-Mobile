@@ -349,8 +349,9 @@ export default function VideoPlayerScreen() {
 
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
 
-  // Embedded (non-fullscreen) player sizing — 16:9 with a sensible max width
-  const embeddedWidth = Math.min(windowWidth, PLAYER_MAX_WIDTH);
+  // Embedded (non-fullscreen) player sizing — 16:9, full-width on tablet/desktop
+  const EMBED_H_MARGIN = windowWidth >= 700 ? 24 : 0;
+  const embeddedWidth = windowWidth - EMBED_H_MARGIN * 2;
   const embeddedHeight = Math.round(embeddedWidth * 9 / 16);
 
   // Fullscreen player sizing — fill the actual screen
@@ -845,54 +846,7 @@ export default function VideoPlayerScreen() {
               onChangeState={handleStateChange}
             />
 
-            {/* Transport overlay (fullscreen) */}
-            {ready && (
-              <View style={styles.transportOverlay} pointerEvents="box-none">
-                <LinearGradient
-                  colors={["transparent", "rgba(0,0,0,0.7)"]}
-                  style={styles.transportGradient}
-                />
-                <View style={styles.transportRow}>
-                  <Pressable
-                    onPress={skipBack}
-                    style={({ pressed }) => [
-                      styles.transportBtn,
-                      pressed && styles.transportBtnPressed,
-                    ]}
-                    hitSlop={8}
-                  >
-                    <Rewind size={28} color={Colors.white} />
-                  </Pressable>
 
-                  <Pressable
-                    onPress={togglePlayPause}
-                    style={({ pressed }) => [
-                      styles.transportBtn,
-                      styles.transportBtnPlay,
-                      pressed && styles.transportBtnPressed,
-                    ]}
-                    hitSlop={8}
-                  >
-                    {isPlaying ? (
-                      <Pause size={30} color={Colors.white} />
-                    ) : (
-                      <Play size={30} color={Colors.white} />
-                    )}
-                  </Pressable>
-
-                  <Pressable
-                    onPress={skipForward}
-                    style={({ pressed }) => [
-                      styles.transportBtn,
-                      pressed && styles.transportBtnPressed,
-                    ]}
-                    hitSlop={8}
-                  >
-                    <FastForward size={28} color={Colors.white} />
-                  </Pressable>
-                </View>
-              </View>
-            )}
           </View>
         ) : (
           <View>
@@ -1004,6 +958,7 @@ export default function VideoPlayerScreen() {
           style={[
             styles.progressRow,
             isFullscreen && styles.progressRowFullscreen,
+            isFullscreen && { bottom: insets.bottom + 110 },
           ]}
         >
           <Text style={styles.progressTimeText}>
@@ -1059,13 +1014,66 @@ export default function VideoPlayerScreen() {
         </View>
       )}
 
-      {/* ── Fullscreen speed + countdown overlay ─────────────── */}
+      {/* ── Fullscreen bottom bar (transport + speed + countdown) ── */}
       {isFullscreen && ready && (
-        <View style={styles.fullscreenControls} pointerEvents="box-none">
-          <View style={{ flexShrink: 1 }}>
-            {speedPillsRow}
+        <View
+          style={[
+            styles.fullscreenBottomBar,
+            { paddingBottom: insets.bottom + 16 },
+          ]}
+          pointerEvents="box-none"
+        >
+          <LinearGradient
+            colors={["transparent", "rgba(0,0,0,0.7)"]}
+            style={styles.fullscreenBottomGradient}
+          />
+          {/* Transport row */}
+          <View style={styles.fullscreenTransportRow}>
+            <Pressable
+              onPress={skipBack}
+              style={({ pressed }) => [
+                styles.transportBtn,
+                pressed && styles.transportBtnPressed,
+              ]}
+              hitSlop={8}
+            >
+              <Rewind size={28} color={Colors.white} />
+            </Pressable>
+
+            <Pressable
+              onPress={togglePlayPause}
+              style={({ pressed }) => [
+                styles.transportBtn,
+                styles.transportBtnPlay,
+                pressed && styles.transportBtnPressed,
+              ]}
+              hitSlop={8}
+            >
+              {isPlaying ? (
+                <Pause size={30} color={Colors.white} />
+              ) : (
+                <Play size={30} color={Colors.white} />
+              )}
+            </Pressable>
+
+            <Pressable
+              onPress={skipForward}
+              style={({ pressed }) => [
+                styles.transportBtn,
+                pressed && styles.transportBtnPressed,
+              ]}
+              hitSlop={8}
+            >
+              <FastForward size={28} color={Colors.white} />
+            </Pressable>
           </View>
-          {countdownPill}
+          {/* Speed pills + countdown */}
+          <View style={styles.fullscreenControlsRow}>
+            <View style={{ flexShrink: 1 }}>
+              {speedPillsRow}
+            </View>
+            {countdownPill}
+          </View>
         </View>
       )}
 
@@ -1341,7 +1349,6 @@ const styles = StyleSheet.create({
   // ── Player wrappers ─────────────────────────────────────────
   playerWrapper: {
     width: "100%",
-    maxWidth: PLAYER_MAX_WIDTH,
     alignSelf: "center",
     backgroundColor: Colors.black,
     overflow: "hidden",
@@ -1416,7 +1423,6 @@ const styles = StyleSheet.create({
   // ── Progress / scrubber row ─────────────────────────────────
   progressRow: {
     width: "100%",
-    maxWidth: PLAYER_MAX_WIDTH,
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
@@ -1426,7 +1432,7 @@ const styles = StyleSheet.create({
   },
   progressRowFullscreen: {
     position: "absolute",
-    bottom: 60,
+    bottom: 110,
     left: 0,
     right: 0,
     maxWidth: "100%",
@@ -1543,19 +1549,33 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"] as const,
   },
 
-  // ── Fullscreen controls overlay ─────────────────────────────
-  fullscreenControls: {
+  // ── Fullscreen bottom bar ───────────────────────────────────
+  fullscreenBottomBar: {
     position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    paddingBottom: 24,
-    paddingHorizontal: 16,
     zIndex: 105,
+  },
+  fullscreenBottomGradient: {
+    ...StyleSheet.absoluteFillObject,
+    height: 160,
+    top: undefined,
+  },
+  fullscreenTransportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 24,
+    paddingBottom: 10,
+    paddingHorizontal: 24,
+  },
+  fullscreenControlsRow: {
     flexDirection: "row",
     alignItems: "flex-end",
     justifyContent: "space-between",
     gap: 12,
+    paddingHorizontal: 16,
   },
 
   // ── Status actions ──────────────────────────────────────────
