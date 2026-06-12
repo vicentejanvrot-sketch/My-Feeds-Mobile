@@ -88,7 +88,7 @@ function AuthGate() {
             headerBackVisible: false,
             headerLeft: () => (
               <Pressable
-                onPress={() => router.replace("/(tabs)/settings")}
+                onPress={() => router.replace("/(tabs)")}
                 style={styles.backBtn}
                 hitSlop={8}
               >
@@ -109,7 +109,7 @@ function AuthGate() {
             headerBackVisible: false,
             headerLeft: () => (
               <Pressable
-                onPress={() => router.replace("/(tabs)/settings")}
+                onPress={() => router.replace("/(tabs)")}
                 style={styles.backBtn}
                 hitSlop={8}
               >
@@ -130,7 +130,7 @@ function AuthGate() {
             headerBackVisible: false,
             headerLeft: () => (
               <Pressable
-                onPress={() => router.replace("/(tabs)/settings")}
+                onPress={() => router.replace("/(tabs)")}
                 style={styles.backBtn}
                 hitSlop={8}
               >
