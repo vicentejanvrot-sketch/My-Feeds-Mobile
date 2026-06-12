@@ -341,8 +341,17 @@ export default function VideoPlayerScreen() {
   // Embedded (non-fullscreen) player sizing — 16:9, full-width on tablet/desktop
   const EMBED_H_MARGIN = windowWidth >= 700 ? 24 : 0;
   const embeddedWidth = windowWidth - EMBED_H_MARGIN * 2;
-  // embeddedHeight is no longer needed — VideoPlayerContent derives
-  // its own 16:9 height from width alone (see VideoPlayerContent.native.tsx).
+
+  // Fullscreen sizing — fill the full screen width edge-to-edge,
+  // with black bars only on top/bottom (no pillarboxing).
+  const longEdge = Math.max(windowWidth, windowHeight);
+  const shortEdge = Math.min(windowWidth, windowHeight);
+  let fullscreenWidth = longEdge;
+  let fullscreenHeight = Math.round(longEdge / (16 / 9));
+  if (fullscreenHeight > shortEdge) {
+    fullscreenHeight = shortEdge;
+    fullscreenWidth = Math.round(shortEdge * (16 / 9));
+  }
 
   const handleClose = useCallback(() => {
     router.back();
@@ -796,16 +805,16 @@ export default function VideoPlayerScreen() {
             style={[
               styles.fullscreenPlayerInner,
               {
-                width: windowWidth,
-                height: windowHeight,
+                width: fullscreenWidth,
+                height: fullscreenHeight,
               },
             ]}
           >
             <VideoPlayerContent
               ref={playerRef}
               videoId={videoIdStr}
-              width={windowWidth}
-              height={windowHeight}
+              width={fullscreenWidth}
+              height={fullscreenHeight}
               playbackRate={playbackRate}
               onReady={() => {
                 setReady(true);
