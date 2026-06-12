@@ -467,7 +467,7 @@ const styles = StyleSheet.create({
   loadingText: { fontSize: 14, color: Colors.textSecondary },
 
   // List
-  list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40, maxWidth: 720, alignSelf: "center" },
+  list: { paddingHorizontal: 16, paddingTop: 16, paddingBottom: 40, maxWidth: 720, width: "100%", alignSelf: "center" },
   listEmpty: { flex: 1, justifyContent: "center" },
 
   // Empty
@@ -491,6 +491,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
+    alignSelf: "stretch",
   },
 
   // Top row
