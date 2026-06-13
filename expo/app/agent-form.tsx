@@ -4,6 +4,7 @@ import {
   Alert,
   Keyboard,
   KeyboardAvoidingView,
+  Modal,
   PanResponder,
   Platform,
   Pressable,
@@ -1052,15 +1053,48 @@ function TimeSelect({
   onSelect: (v: string) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [menuLayout, setMenuLayout] = useState<{
+    x: number;
+    y: number;
+    w: number;
+    h: number;
+  } | null>(null);
+  const triggerRef = useRef<View>(null);
+
+  const handleToggle = useCallback(() => {
+    if (open) {
+      setOpen(false);
+      setMenuLayout(null);
+    } else {
+      triggerRef.current?.measureInWindow((mx, my, mw, mh) => {
+        setMenuLayout({ x: mx, y: my, w: mw, h: mh });
+        setOpen(true);
+      });
+    }
+  }, [open]);
+
+  const handleSelect = useCallback(
+    (v: string) => {
+      onSelect(v);
+      setOpen(false);
+      setMenuLayout(null);
+    },
+    [onSelect],
+  );
+
+  const handleClose = useCallback(() => {
+    setOpen(false);
+    setMenuLayout(null);
+  }, []);
 
   return (
-    <View style={[timeSelectStyles.wrap, open && timeSelectStyles.wrapOpen]}>
+    <View ref={triggerRef} style={timeSelectStyles.wrap} collapsable={false}>
       <Pressable
         style={({ pressed }) => [
           timeSelectStyles.trigger,
           pressed && { opacity: 0.8 },
         ]}
-        onPress={() => setOpen((v) => !v)}
+        onPress={handleToggle}
       >
         <Text style={timeSelectStyles.triggerText}>{value}</Text>
         {open ? (
@@ -1069,49 +1103,65 @@ function TimeSelect({
           <ChevronDown size={12} color={Colors.textSecondary} />
         )}
       </Pressable>
-      {open ? (
-        <View style={timeSelectStyles.menu}>
-          <ScrollView
-            style={timeSelectStyles.menuScroll}
-            nestedScrollEnabled
-            showsVerticalScrollIndicator={false}
-          >
-            {options.map((opt) => {
-              const selected = opt === value;
-              return (
-                <Pressable
-                  key={opt}
-                  style={({ pressed }) => [
-                    timeSelectStyles.option,
-                    selected && timeSelectStyles.optionSelected,
-                    pressed && { opacity: 0.7 },
-                  ]}
-                  onPress={() => {
-                    onSelect(opt);
-                    setOpen(false);
-                  }}
-                >
-                  <Text
-                    style={[
-                      timeSelectStyles.optionText,
-                      selected && timeSelectStyles.optionTextSelected,
-                    ]}
-                  >
-                    {opt}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
+      {open && menuLayout ? (
+        <Modal
+          transparent
+          animationType="fade"
+          visible={open}
+          onRequestClose={handleClose}
+        >
+          <Pressable style={modalStyles.backdrop} onPress={handleClose}>
+            <Pressable
+              style={[
+                modalStyles.menuContainer,
+                {
+                  position: "absolute",
+                  top: menuLayout.y + menuLayout.h + 4,
+                  left: menuLayout.x,
+                  width: menuLayout.w,
+                },
+              ]}
+              onPress={() => {}}
+            >
+              <ScrollView
+                style={modalStyles.menuScroll}
+                nestedScrollEnabled
+                showsVerticalScrollIndicator={false}
+              >
+                {options.map((opt) => {
+                  const selected = opt === value;
+                  return (
+                    <Pressable
+                      key={opt}
+                      style={({ pressed }) => [
+                        timeSelectStyles.option,
+                        selected && timeSelectStyles.optionSelected,
+                        pressed && { opacity: 0.7 },
+                      ]}
+                      onPress={() => handleSelect(opt)}
+                    >
+                      <Text
+                        style={[
+                          timeSelectStyles.optionText,
+                          selected && timeSelectStyles.optionTextSelected,
+                        ]}
+                      >
+                        {opt}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
       ) : null}
     </View>
   );
 }
 
 const timeSelectStyles = StyleSheet.create({
-  wrap: { position: "relative", flex: 1 },
-  wrapOpen: { zIndex: 999, elevation: 10 },
+  wrap: { flex: 1 },
   trigger: {
     flexDirection: "row",
     alignItems: "center",
@@ -1125,26 +1175,6 @@ const timeSelectStyles = StyleSheet.create({
     gap: 2,
   },
   triggerText: { fontSize: 13, color: Colors.textPrimary, fontWeight: "500" as const },
-  menu: {
-    position: "absolute",
-    top: "100%",
-    left: 0,
-    right: 0,
-    marginTop: 4,
-    backgroundColor: Colors.card,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: Colors.border,
-    maxHeight: 180,
-    overflow: "hidden",
-    zIndex: 9999,
-    elevation: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-  },
-  menuScroll: { maxHeight: 178 },
   option: {
     paddingHorizontal: 12,
     paddingVertical: 8,
@@ -1155,6 +1185,26 @@ const timeSelectStyles = StyleSheet.create({
   optionSelected: { backgroundColor: `${Colors.accent}15` },
   optionText: { fontSize: 13, color: Colors.textSecondary },
   optionTextSelected: { color: Colors.accent, fontWeight: "600" as const },
+});
+
+const modalStyles = StyleSheet.create({
+  backdrop: {
+    flex: 1,
+  },
+  menuContainer: {
+    backgroundColor: Colors.card,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.border,
+    maxHeight: 180,
+    overflow: "hidden",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 10,
+  },
+  menuScroll: { maxHeight: 178 },
 });
 
 // ─── Chip ────────────────────────────────────────────────────────────
