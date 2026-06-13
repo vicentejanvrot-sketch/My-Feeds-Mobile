@@ -794,8 +794,13 @@ export default function VideoPlayerScreen() {
             <View style={styles.speedPillsWrapper}>
               {speedPillsRow}
             </View>
-            {countdownPill}
           </Animated.View>
+          {/* Countdown row (embedded) */}
+          {countdownPill ? (
+            <Animated.View style={[styles.countdownRow, { opacity: controlsOpacity }]}>
+              {countdownPill}
+            </Animated.View>
+          ) : null}
 
           {/* Status actions */}
           <View style={styles.actionsRow}>
@@ -971,7 +976,16 @@ export default function VideoPlayerScreen() {
                 <LinearGradient
                   colors={["transparent", "rgba(0,0,0,0.7)"]}
                   style={styles.transportGradient}
+                  pointerEvents="none"
                 />
+                {/* Close button */}
+                <Pressable
+                  onPress={handleClose}
+                  style={styles.embeddedCloseBtn}
+                  hitSlop={12}
+                >
+                  <X size={22} color={Colors.white} />
+                </Pressable>
                 <View style={styles.transportRow}>
                   <Pressable
                     onPress={skipBack}
@@ -1016,25 +1030,6 @@ export default function VideoPlayerScreen() {
           </View>
         )}
 
-        {/* Fullscreen close button */}
-        {isFullscreen && (
-          <Animated.View style={{ opacity: controlsOpacity }}>
-            <Pressable
-              onPress={() => {
-                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                exitFullscreen();
-                handleClose();
-              }}
-              style={[
-                styles.fullscreenCloseBtn,
-                { top: insets.top + 8 },
-              ]}
-              hitSlop={12}
-            >
-              <X size={22} color={Colors.white} />
-            </Pressable>
-          </Animated.View>
-        )}
       </View>
 
       {/* ── Progress / scrubber row ──────────────────────────── */}
@@ -1113,6 +1108,7 @@ export default function VideoPlayerScreen() {
           <LinearGradient
             colors={["transparent", "rgba(0,0,0,0.7)"]}
             style={styles.fullscreenBottomGradient}
+            pointerEvents="none"
           />
           {/* Transport row */}
           <View style={styles.fullscreenTransportRow}>
@@ -1154,13 +1150,40 @@ export default function VideoPlayerScreen() {
               <FastForward size={28} color={Colors.white} />
             </Pressable>
           </View>
-          {/* Speed pills + countdown */}
-          <View style={styles.fullscreenControlsRow}>
-            <View style={{ flexShrink: 1 }}>
+          {/* Speed pills */}
+          <View style={[styles.fullscreenControlsRow, styles.fullscreenControlsRowTop]}>
+            <View style={{ flex: 1 }}>
               {speedPillsRow}
             </View>
-            {countdownPill}
           </View>
+          {/* Countdown */}
+          {countdownPill ? (
+            <View style={styles.fullscreenControlsRow}>
+              {countdownPill}
+            </View>
+          ) : null}
+        </Animated.View>
+      )}
+
+      {/* Fullscreen close button — root level so it renders above all overlays */}
+      {isFullscreen && (
+        <Animated.View
+          style={[
+            styles.fullscreenCloseBtnRoot,
+            { top: insets.top + 8, opacity: controlsOpacity },
+          ]}
+        >
+          <Pressable
+            onPress={() => {
+              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              exitFullscreen();
+              handleClose();
+            }}
+            style={styles.fullscreenCloseBtnInner}
+            hitSlop={12}
+          >
+            <X size={22} color={Colors.white} />
+          </Pressable>
         </Animated.View>
       )}
 
@@ -1582,12 +1605,31 @@ const styles = StyleSheet.create({
     alignSelf: "center",
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 6,
   },
   speedPillsWrapper: {
-    flexShrink: 1,
+    flex: 1,
+  },
+  countdownRow: {
+    width: "100%",
+    alignSelf: "center",
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingBottom: 8,
+  },
+  embeddedCloseBtn: {
+    position: "absolute",
+    top: 8,
+    right: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 20,
   },
 
   // ── Speed pills ─────────────────────────────────────────────
@@ -1659,9 +1701,24 @@ const styles = StyleSheet.create({
   fullscreenControlsRow: {
     flexDirection: "row",
     alignItems: "flex-end",
-    justifyContent: "space-between",
     gap: 12,
     paddingHorizontal: 16,
+  },
+  fullscreenControlsRowTop: {
+    paddingBottom: 6,
+  },
+  fullscreenCloseBtnRoot: {
+    position: "absolute",
+    right: 12,
+    zIndex: 200,
+  },
+  fullscreenCloseBtnInner: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
   },
 
   // ── Status actions ──────────────────────────────────────────
