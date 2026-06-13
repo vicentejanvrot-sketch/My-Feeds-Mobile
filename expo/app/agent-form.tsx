@@ -683,6 +683,7 @@ const sectionStyles = StyleSheet.create({
     padding: 16,
     borderWidth: 1,
     borderColor: "hsl(220, 25%, 18%)",
+    overflow: "visible" as const,
   },
 });
 
@@ -1053,7 +1054,7 @@ function TimeSelect({
   const [open, setOpen] = useState(false);
 
   return (
-    <View style={timeSelectStyles.wrap}>
+    <View style={[timeSelectStyles.wrap, open && timeSelectStyles.wrapOpen]}>
       <Pressable
         style={({ pressed }) => [
           timeSelectStyles.trigger,
@@ -1110,6 +1111,7 @@ function TimeSelect({
 
 const timeSelectStyles = StyleSheet.create({
   wrap: { position: "relative", flex: 1 },
+  wrapOpen: { zIndex: 999, elevation: 10 },
   trigger: {
     flexDirection: "row",
     alignItems: "center",
@@ -1135,7 +1137,12 @@ const timeSelectStyles = StyleSheet.create({
     borderColor: Colors.border,
     maxHeight: 180,
     overflow: "hidden",
-    zIndex: 100,
+    zIndex: 9999,
+    elevation: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
   },
   menuScroll: { maxHeight: 178 },
   option: {
