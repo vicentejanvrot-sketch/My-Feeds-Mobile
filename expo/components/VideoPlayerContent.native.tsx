@@ -150,6 +150,11 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     const [shouldPlay, setShouldPlay] = useState(false);
     const [nativeVolume, setNativeVolume] = useState(100);
     const [nativeMuted, setNativeMuted] = useState(false);
+    /** Tracks actual YouTube playback state from onChangeState events.
+     *  Kept in a ref so togglePlayback can decide play vs pause correctly
+     *  even when shouldPlay (the React state driving the `play` prop) is
+     *  stale relative to the real player. */
+    const isPlayingRef = useRef(false);
 
     // Force the player into an exact 16:9 box derived from width only.
     // The incoming height prop is accepted for backward compat but NOT
@@ -171,7 +176,13 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     }, []);
 
     const togglePlayback = useCallback(async () => {
-      setShouldPlay((prev) => !prev);
+      // Use the actual playback state tracked from onChangeState events
+      // rather than the shouldPlay React state, which can drift from reality.
+      if (isPlayingRef.current) {
+        setShouldPlay(false);
+      } else {
+        setShouldPlay(true);
+      }
     }, []);
 
     const seekTo = useCallback(async (seconds: number) => {
@@ -208,6 +219,25 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       togglePlayback,
     }), [play, pause, seekTo, togglePlayback]);
 
+    /** Intercept onChangeState to keep shouldPlay in sync with the real
+     *  YouTube player. Without this, shouldPlay can drift (e.g. autoplay
+     *  starts the video but shouldPlay stays false), causing togglePlayback
+     *  to send a no-op command. Syncing here guarantees togglePlayback
+     *  always toggles from the correct baseline. */
+    const handleStateChange = useCallback(
+      (event: string) => {
+        if (event === "playing") {
+          isPlayingRef.current = true;
+          setShouldPlay(true);
+        } else if (event === "paused" || event === "ended" || event === "unstarted") {
+          isPlayingRef.current = false;
+          setShouldPlay(false);
+        }
+        onChangeState?.(event);
+      },
+      [onChangeState],
+    );
+
     return (
       <View
         style={{
@@ -229,7 +259,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           playbackRate={playbackRate}
           onReady={onReady}
           onError={onError}
-          onChangeState={onChangeState}
+          onChangeState={handleStateChange}
           webViewProps={{
             allowsInlineMediaPlayback: true,
             mediaPlaybackRequiresUserAction: false,
