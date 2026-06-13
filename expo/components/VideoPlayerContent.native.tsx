@@ -21,6 +21,12 @@ export interface VideoPlayerHandle {
   pause: () => Promise<void>;
   /** Seek to a specific time in seconds. */
   seekTo: (seconds: number) => Promise<void>;
+  /** Set playback volume (0–100). No-op on native; controlled via device buttons. */
+  setVolume: (volume: number) => Promise<void>;
+  /** Mute audio. No-op on native. */
+  mute: () => Promise<void>;
+  /** Unmute audio. No-op on native. */
+  unMute: () => Promise<void>;
 }
 
 /**
@@ -63,6 +69,8 @@ interface VideoPlayerContentProps {
   onError?: () => void;
   /** Fires when the YouTube player state changes (playing, paused, ended, etc.). */
   onChangeState?: (event: string) => void;
+  /** Fires periodically with the latest currentTime (seconds) and duration (seconds). */
+  onProgress?: (currentTime: number, duration: number) => void;
   /** Ignored on native — only meaningful on web to block iframe tap interception. */
   blockIframeTouches?: boolean;
 }
@@ -79,7 +87,7 @@ interface VideoPlayerContentProps {
  */
 const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps>(
   function VideoPlayerContent(
-    { videoId, width, height: _height, playbackRate = 1, onReady, onError, onChangeState, blockIframeTouches: _blockIframeTouches },
+    { videoId, width, height: _height, playbackRate = 1, onReady, onError, onChangeState, onProgress: _onProgress, blockIframeTouches: _blockIframeTouches },
     ref,
   ) {
     const youtubeRef = useRef<YoutubeIframeRef | null>(null);
@@ -122,6 +130,9 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       play,
       pause,
       seekTo,
+      setVolume: () => Promise.resolve(),
+      mute: () => Promise.resolve(),
+      unMute: () => Promise.resolve(),
     }), [play, pause, seekTo]);
 
     return (

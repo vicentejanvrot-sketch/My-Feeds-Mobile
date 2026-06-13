@@ -5,9 +5,9 @@ import { View, StyleSheet, Platform, type ViewStyle } from "react-native";
 
 export interface VideoPlayerHandle {
   inject: (js: string) => void;
-  /** Returns the current playback position in seconds (0 on web — unavailable). */
+  /** Returns the current playback position in seconds. */
   getCurrentTime: () => Promise<number>;
-  /** Returns the total video duration in seconds (0 on web — unavailable). */
+  /** Returns the total video duration in seconds. */
   getDuration: () => Promise<number>;
   /** Request the iframe to enter fullscreen (web Fullscreen API). */
   requestFullscreen: () => Promise<void>;
@@ -19,6 +19,12 @@ export interface VideoPlayerHandle {
   pause: () => Promise<void>;
   /** Seek to a specific time in seconds. */
   seekTo: (seconds: number) => Promise<void>;
+  /** Set playback volume (0–100). */
+  setVolume: (volume: number) => Promise<void>;
+  /** Mute audio. */
+  mute: () => Promise<void>;
+  /** Unmute audio. */
+  unMute: () => Promise<void>;
 }
 
 interface VideoPlayerContentProps {
@@ -30,6 +36,8 @@ interface VideoPlayerContentProps {
   onError?: () => void;
   /** Fires when the YouTube player state changes (playing, paused, ended, etc.). */
   onChangeState?: (event: string) => void;
+  /** Fires periodically with the latest currentTime (seconds) and duration (seconds). */
+  onProgress?: (currentTime: number, duration: number) => void;
   /** When true, the iframe gets pointer-events: none so taps reach overlay controls. */
   blockIframeTouches?: boolean;
 }
@@ -69,7 +77,7 @@ function postToPlayer(iframe: HTMLIFrameElement | null, command: string, args?: 
  */
 const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps>(
   function VideoPlayerContent(
-    { videoId, width: _width, height = 220, playbackRate: _playbackRate, onReady, onError, onChangeState, blockIframeTouches },
+    { videoId, width: _width, height = 220, playbackRate: _playbackRate, onReady, onError, onChangeState, onProgress, blockIframeTouches },
     ref,
   ) {
     const iframeElRef = useRef<HTMLIFrameElement | null>(null);
@@ -79,6 +87,12 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     const pendingCommandsRef = useRef<Array<() => void>>([]);
     /** Tracks whether the iframe DOM has fired its load event. */
     const iframeLoadedRef = useRef(false);
+    /** Latest currentTime from YouTube infoDelivery events. */
+    const currentTimeRef = useRef(0);
+    /** Latest duration from YouTube infoDelivery events. */
+    const durationRef = useRef(0);
+    /** Interval ID for the progress-polling heartbeat. Cleared on unmount. */
+    const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
     /** Post a command now if the player is ready, otherwise queue it. */
     const sendCommand = useCallback((command: string, args?: unknown) => {
@@ -102,6 +116,18 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       sendCommand("seekTo", seconds);
     }, [sendCommand]);
 
+    const setVolume = useCallback(async (volume: number) => {
+      sendCommand("setVolume", volume);
+    }, [sendCommand]);
+
+    const mute = useCallback(async () => {
+      sendCommand("mute");
+    }, [sendCommand]);
+
+    const unMute = useCallback(async () => {
+      sendCommand("unMute");
+    }, [sendCommand]);
+
     // ── YouTube IFrame API listening handshake ────────────
     /** Posts the handshake that tells YouTube the host is ready to receive API events. */
     const sendListeningHandshake = useCallback(() => {
@@ -121,16 +147,25 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       iframeLoadedRef.current = true;
       sendListeningHandshake();
 
-      const interval = setInterval(() => {
+      const handshakeInterval = setInterval(() => {
         if (playerReadyRef.current) {
-          clearInterval(interval);
+          clearInterval(handshakeInterval);
           return;
         }
         sendListeningHandshake();
       }, 500);
 
       // Safety: stop retrying after 10 seconds even if onReady never arrives
-      setTimeout(() => clearInterval(interval), 10_000);
+      setTimeout(() => clearInterval(handshakeInterval), 10_000);
+
+      // Keep infoDelivery flowing by periodically re-posting the handshake
+      // while the player is ready — this keeps currentTime updating.
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      pollIntervalRef.current = setInterval(() => {
+        if (playerReadyRef.current) {
+          sendListeningHandshake();
+        }
+      }, 500);
 
       onReady?.();
     }, [sendListeningHandshake, onReady]);
@@ -148,8 +183,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           // ignore injection failures
         }
       },
-      getCurrentTime: () => Promise.resolve(0),
-      getDuration: () => Promise.resolve(0),
+      getCurrentTime: () => Promise.resolve(currentTimeRef.current),
+      getDuration: () => Promise.resolve(durationRef.current),
       requestFullscreen: async () => {
         if (iframeElRef.current) {
           try {
@@ -181,7 +216,20 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       play,
       pause,
       seekTo,
-    }), [play, pause, seekTo]);
+      setVolume,
+      mute,
+      unMute,
+    }), [play, pause, seekTo, setVolume, mute, unMute]);
+
+    // ── Cleanup poll interval on unmount ────────────────
+    useEffect(() => {
+      return () => {
+        if (pollIntervalRef.current) {
+          clearInterval(pollIntervalRef.current);
+          pollIntervalRef.current = null;
+        }
+      };
+    }, []);
 
     // ── Listen for YouTube IFrame API postMessage events ────
     useEffect(() => {
@@ -208,23 +256,37 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           return;
         }
 
-        // Player state change: {"event":"infoDelivery","info":{"playerState":1,...}}
-        if (
-          data.event === "infoDelivery" &&
-          data.info &&
-          typeof (data.info as Record<string, unknown>).playerState === "number"
-        ) {
-          const state = (data.info as { playerState: number }).playerState;
-          const eventName = PLAYER_STATE_MAP[state];
-          if (eventName) {
-            onChangeState?.(eventName);
+        // infoDelivery carries player state AND time updates
+        if (data.event === "infoDelivery" && data.info) {
+          const info = data.info as Record<string, unknown>;
+
+          // Track real playback time
+          if (typeof info.currentTime === "number") {
+            currentTimeRef.current = info.currentTime;
+          }
+          if (typeof info.duration === "number") {
+            durationRef.current = info.duration;
+          }
+          if (
+            typeof info.currentTime === "number" ||
+            typeof info.duration === "number"
+          ) {
+            onProgress?.(currentTimeRef.current, durationRef.current);
+          }
+
+          // Player state change
+          if (typeof info.playerState === "number") {
+            const eventName = PLAYER_STATE_MAP[info.playerState as number];
+            if (eventName) {
+              onChangeState?.(eventName);
+            }
           }
         }
       };
 
       window.addEventListener("message", handleMessage);
       return () => window.removeEventListener("message", handleMessage);
-    }, [onChangeState]);
+    }, [onChangeState, onProgress]);
 
     const embedUrl = (() => {
       let url =

@@ -38,6 +38,8 @@ import {
   Send,
   Settings,
   Share2,
+  Volume2,
+  VolumeX,
   X,
 } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
@@ -162,6 +164,20 @@ export default function VideoPlayerScreen() {
   const [shareOpen, setShareOpen] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+
+  // ── Volume state ───────────────────────────────────────────
+  const [volume, setVolumeState] = useState(100);
+  const [isMuted, setIsMuted] = useState(false);
+  const volumeRef = useRef(volume);
+  const isMutedRef = useRef(isMuted);
+
+  useEffect(() => {
+    volumeRef.current = volume;
+  }, [volume]);
+
+  useEffect(() => {
+    isMutedRef.current = isMuted;
+  }, [isMuted]);
 
   // ── Progress bar scrubbing state ─────────────────────────────
 
@@ -333,6 +349,17 @@ export default function VideoPlayerScreen() {
     }
   }, [isFullscreen, enterFullscreen, exitFullscreen, resetControlsTimer]);
 
+  // ── Progress callback from the web player ──────────────────
+  const handleProgress = useCallback(
+    (ct: number, dur: number) => {
+      // Don't fight the user's drag — skip updates while scrubbing
+      if (isSeekingRef.current) return;
+      if (typeof ct === "number") setCurrentTime(ct);
+      if (typeof dur === "number") setDuration(dur);
+    },
+    [],
+  );
+
   const handleStateChange = useCallback(
     (event: string) => {
       if (event === "playing") {
@@ -483,6 +510,36 @@ export default function VideoPlayerScreen() {
   }, [videoIdStr, showToast]);
 
   const shareUrl = `https://www.youtube.com/watch?v=${videoIdStr}`;
+
+  // ── Transport controls ───────────────────────────────────────
+
+  // ── Volume controls ────────────────────────────────────────
+
+  const handleToggleMute = useCallback(async () => {
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    resetControlsTimer();
+    if (isMutedRef.current) {
+      await playerRef.current?.unMute();
+      setIsMuted(false);
+    } else {
+      await playerRef.current?.mute();
+      setIsMuted(true);
+    }
+  }, [resetControlsTimer]);
+
+  const handleVolumeChange = useCallback(
+    async (v: number) => {
+      resetControlsTimer();
+      const clamped = Math.max(0, Math.min(100, Math.round(v)));
+      setVolumeState(clamped);
+      await playerRef.current?.setVolume(clamped);
+      // If we were muted, unmute when user adjusts volume
+      if (isMutedRef.current) {
+        setIsMuted(false);
+      }
+    },
+    [resetControlsTimer],
+  );
 
   // ── Transport controls ───────────────────────────────────────
 
@@ -960,6 +1017,7 @@ export default function VideoPlayerScreen() {
                 }, 4000);
               }}
               onChangeState={handleStateChange}
+              onProgress={handleProgress}
             />
 
 
@@ -997,6 +1055,7 @@ export default function VideoPlayerScreen() {
                 }, 4000);
               }}
               onChangeState={handleStateChange}
+              onProgress={handleProgress}
             />
 
             {/* Transport overlay (embedded) */}
@@ -1053,6 +1112,54 @@ export default function VideoPlayerScreen() {
                   >
                     <FastForward size={26} color={Colors.white} />
                   </Pressable>
+                </View>
+
+                {/* Volume control (embedded) */}
+                <View style={styles.volumeRow}>
+                  <Pressable
+                    onPress={handleToggleMute}
+                    style={({ pressed }) => [
+                      styles.volumeBtn,
+                      pressed && styles.volumeBtnPressed,
+                    ]}
+                    hitSlop={8}
+                  >
+                    {isMuted ? (
+                      <VolumeX size={18} color={Colors.white} />
+                    ) : (
+                      <Volume2 size={18} color={Colors.white} />
+                    )}
+                  </Pressable>
+                  {!isMuted && (
+                    <View
+                      style={styles.volumeSliderArea}
+                      onStartShouldSetResponder={() => true}
+                      onMoveShouldSetResponder={() => true}
+                      onResponderGrant={(evt) => {
+                        const x = evt.nativeEvent.locationX;
+                        handleVolumeChange((x / 80) * 100);
+                      }}
+                      onResponderMove={(evt) => {
+                        const x = evt.nativeEvent.locationX;
+                        handleVolumeChange((x / 80) * 100);
+                      }}
+                    >
+                      <View style={styles.volumeSliderTrack} pointerEvents="none">
+                        <View
+                          style={[
+                            styles.volumeSliderFill,
+                            { width: `${volume}%` },
+                          ]}
+                        />
+                        <View
+                          style={[
+                            styles.volumeSliderThumb,
+                            { left: `${volume}%` },
+                          ]}
+                        />
+                      </View>
+                    </View>
+                  )}
                 </View>
               </Animated.View>
             )}
@@ -1178,6 +1285,53 @@ export default function VideoPlayerScreen() {
             >
               <FastForward size={28} color={Colors.white} />
             </Pressable>
+          </View>
+          {/* Volume control (fullscreen) */}
+          <View style={styles.fullscreenVolumeRow}>
+            <Pressable
+              onPress={handleToggleMute}
+              style={({ pressed }) => [
+                styles.volumeBtn,
+                pressed && styles.volumeBtnPressed,
+              ]}
+              hitSlop={8}
+            >
+              {isMuted ? (
+                <VolumeX size={18} color={Colors.white} />
+              ) : (
+                <Volume2 size={18} color={Colors.white} />
+              )}
+            </Pressable>
+            {!isMuted && (
+              <View
+                style={styles.volumeSliderArea}
+                onStartShouldSetResponder={() => true}
+                onMoveShouldSetResponder={() => true}
+                onResponderGrant={(evt) => {
+                  const x = evt.nativeEvent.locationX;
+                  handleVolumeChange((x / 80) * 100);
+                }}
+                onResponderMove={(evt) => {
+                  const x = evt.nativeEvent.locationX;
+                  handleVolumeChange((x / 80) * 100);
+                }}
+              >
+                <View style={styles.volumeSliderTrack} pointerEvents="none">
+                  <View
+                    style={[
+                      styles.volumeSliderFill,
+                      { width: `${volume}%` },
+                    ]}
+                  />
+                  <View
+                    style={[
+                      styles.volumeSliderThumb,
+                      { left: `${volume}%` },
+                    ]}
+                  />
+                </View>
+              </View>
+            )}
           </View>
           {/* Speed pills */}
           <View style={[styles.fullscreenControlsRow, styles.fullscreenControlsRowTop]}>
@@ -1894,6 +2048,62 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.border,
     marginVertical: 6,
     marginHorizontal: 14,
+  },
+
+  // ── Volume control ─────────────────────────────────────────
+  volumeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingBottom: 14,
+    paddingHorizontal: 24,
+  },
+  volumeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(255,255,255,0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 70,
+  },
+  volumeBtnPressed: {
+    backgroundColor: "rgba(255,255,255,0.25)",
+  },
+  volumeSliderArea: {
+    width: 80,
+    height: 36,
+    justifyContent: "center",
+  },
+  volumeSliderTrack: {
+    width: "100%",
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: "rgba(255,255,255,0.2)",
+    overflow: "visible",
+  },
+  volumeSliderFill: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: Colors.white,
+  },
+  volumeSliderThumb: {
+    position: "absolute",
+    top: -3,
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: Colors.white,
+    marginLeft: -5,
+  },
+  fullscreenVolumeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingBottom: 10,
+    paddingHorizontal: 32,
   },
 
   // ── Auto-watched confirmation overlay ──────────────────────
