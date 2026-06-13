@@ -434,6 +434,34 @@ export default function VideoPlayerScreen() {
     async (status: ItemStatus) => {
       if (!itemIdStr) return;
       void Haptics.selectionAsync();
+
+      // "watched" triggers the same overlay + close flow as video-ended
+      if (status === "watched") {
+        autoWatchedRef.current = true;
+        try {
+          await updateStatus.mutateAsync({ id: itemIdStr, status: "watched" });
+          setWatchedOverlayVisible(true);
+          Animated.timing(watchedOverlayOpacity, {
+            toValue: 1,
+            duration: 300,
+            useNativeDriver: true,
+          }).start();
+          overlayTimerRef.current = setTimeout(() => {
+            Animated.timing(watchedOverlayOpacity, {
+              toValue: 0,
+              duration: 300,
+              useNativeDriver: true,
+            }).start(() => {
+              setWatchedOverlayVisible(false);
+              router.back();
+            });
+          }, 3000);
+        } catch {
+          showToast("Couldn't update status", "error");
+        }
+        return;
+      }
+
       try {
         await updateStatus.mutateAsync({ id: itemIdStr, status });
         showToast(`Marked as ${STATUS_ICONS[status].label}`, "success");
@@ -441,7 +469,7 @@ export default function VideoPlayerScreen() {
         showToast("Couldn't update status", "error");
       }
     },
-    [itemIdStr, updateStatus, showToast],
+    [itemIdStr, updateStatus, showToast, watchedOverlayOpacity],
   );
 
   const handleOpenInYoutube = useCallback(async () => {
@@ -1144,7 +1172,7 @@ export default function VideoPlayerScreen() {
           </View>
           {/* Speed pills */}
           <View style={[styles.fullscreenControlsRow, styles.fullscreenControlsRowTop]}>
-            <View style={{ flex: 1 }}>
+            <View style={{ alignItems: "center" as const }}>
               {speedPillsRow}
             </View>
           </View>
@@ -1502,7 +1530,7 @@ const styles = StyleSheet.create({
   transportOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: "flex-end",
-    zIndex: 5,
+    zIndex: 60,
   },
   transportGradient: {
     ...StyleSheet.absoluteFillObject,
@@ -1514,7 +1542,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 24,
-    paddingBottom: 16,
+    paddingBottom: 28,
     paddingHorizontal: 24,
   },
   transportBtn: {
@@ -1524,6 +1552,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.15)",
     alignItems: "center",
     justifyContent: "center",
+    zIndex: 70,
   },
   transportBtnPlay: {
     width: 52,
@@ -1607,19 +1636,19 @@ const styles = StyleSheet.create({
   embeddedControlsRow: {
     width: "100%",
     alignSelf: "center",
-    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 16,
     paddingVertical: 6,
   },
   speedPillsWrapper: {
-    flex: 1,
+    alignItems: "center",
   },
   countdownRow: {
     width: "100%",
     alignSelf: "center",
     flexDirection: "row",
-    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 16,
     paddingBottom: 8,
   },
@@ -1704,7 +1733,7 @@ const styles = StyleSheet.create({
   },
   fullscreenControlsRow: {
     flexDirection: "row",
-    alignItems: "flex-end",
+    justifyContent: "center",
     gap: 12,
     paddingHorizontal: 16,
   },
