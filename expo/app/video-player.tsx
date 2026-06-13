@@ -30,6 +30,7 @@ import {
   FastForward,
   Heart,
   Maximize,
+  Minimize2,
   MessageCircle,
   MoreHorizontal,
   Pause,
@@ -1240,6 +1241,16 @@ export default function VideoPlayerScreen() {
             <Text style={styles.progressTimeText}>
               {formatTime(duration)}
             </Text>
+            <Pressable
+              onPress={toggleFullscreen}
+              style={({ pressed }) => [
+                styles.fullscreenToggleBtn,
+                pressed && styles.fullscreenToggleBtnPressed,
+              ]}
+              hitSlop={8}
+            >
+              <Minimize2 size={18} color={Colors.textSecondary} />
+            </Pressable>
           </View>
 
           {/* Transport row */}
