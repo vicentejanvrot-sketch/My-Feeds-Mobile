@@ -535,6 +535,7 @@ export default function VideoPlayerScreen() {
       await playerRef.current?.setVolume(clamped);
       // If we were muted, unmute when user adjusts volume
       if (isMutedRef.current) {
+        await playerRef.current?.unMute();
         setIsMuted(false);
       }
     },

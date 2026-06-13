@@ -92,6 +92,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
   ) {
     const youtubeRef = useRef<YoutubeIframeRef | null>(null);
     const [shouldPlay, setShouldPlay] = useState(false);
+    const [nativeVolume, setNativeVolume] = useState(100);
+    const [nativeMuted, setNativeMuted] = useState(false);
 
     // Force the player into an exact 16:9 box derived from width only.
     // The incoming height prop is accepted for backward compat but NOT
@@ -130,9 +132,15 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       play,
       pause,
       seekTo,
-      setVolume: () => Promise.resolve(),
-      mute: () => Promise.resolve(),
-      unMute: () => Promise.resolve(),
+      setVolume: async (volume: number) => {
+        setNativeVolume(volume);
+      },
+      mute: async () => {
+        setNativeMuted(true);
+      },
+      unMute: async () => {
+        setNativeMuted(false);
+      },
     }), [play, pause, seekTo]);
 
     return (
@@ -151,6 +159,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           height={boxHeight}
           videoId={videoId}
           play={shouldPlay}
+          volume={nativeVolume}
+          mute={nativeMuted}
           playbackRate={playbackRate}
           onReady={onReady}
           onError={onError}
