@@ -172,6 +172,77 @@ export default function VideoPlayerScreen() {
   const [isSeeking, setIsSeeking] = useState(false);
   const [seekFraction, setSeekFraction] = useState(0);
 
+  // ── Controls auto-hide ─────────────────────────────────────────
+  const controlsOpacity = useRef(new Animated.Value(1)).current;
+  const controlsTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [controlsHidden, setControlsHidden] = useState(false);
+  const isPlayingRef = useRef(isPlaying);
+  const isSeekingRef = useRef(isSeeking);
+
+  useEffect(() => {
+    isPlayingRef.current = isPlaying;
+  });
+
+  useEffect(() => {
+    isSeekingRef.current = isSeeking;
+  });
+
+  const fadeControlsIn = useCallback(() => {
+    if (controlsTimerRef.current) {
+      clearTimeout(controlsTimerRef.current);
+      controlsTimerRef.current = null;
+    }
+    setControlsHidden(false);
+    Animated.timing(controlsOpacity, {
+      toValue: 1,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  }, [controlsOpacity]);
+
+  const startHideTimer = useCallback(() => {
+    if (controlsTimerRef.current) {
+      clearTimeout(controlsTimerRef.current);
+    }
+    controlsTimerRef.current = setTimeout(() => {
+      controlsTimerRef.current = null;
+      setControlsHidden(true);
+      Animated.timing(controlsOpacity, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true,
+      }).start();
+    }, 5000);
+  }, [controlsOpacity]);
+
+  const resetControlsTimer = useCallback(() => {
+    fadeControlsIn();
+    if (isPlayingRef.current && !isSeekingRef.current) {
+      startHideTimer();
+    }
+  }, [fadeControlsIn, startHideTimer]);
+
+  // Start/stop auto-hide based on playback and seeking state
+  useEffect(() => {
+    if (!ready) return;
+    if (isSeeking) {
+      fadeControlsIn();
+    } else if (isPlaying) {
+      startHideTimer();
+    } else {
+      fadeControlsIn();
+    }
+  }, [isPlaying, isSeeking, ready, fadeControlsIn, startHideTimer]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (controlsTimerRef.current) {
+        clearTimeout(controlsTimerRef.current);
+      }
+    };
+  }, []);
+
   useEffect(() => {
     durationRef.current = duration;
   }, [duration]);
@@ -254,12 +325,13 @@ export default function VideoPlayerScreen() {
 
   const toggleFullscreen = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    resetControlsTimer();
     if (isFullscreen) {
       await exitFullscreen();
     } else {
       await enterFullscreen();
     }
-  }, [isFullscreen, enterFullscreen, exitFullscreen]);
+  }, [isFullscreen, enterFullscreen, exitFullscreen, resetControlsTimer]);
 
   const handleStateChange = useCallback(
     (event: string) => {
@@ -387,26 +459,29 @@ export default function VideoPlayerScreen() {
 
   const togglePlayPause = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    resetControlsTimer();
     if (isPlaying) {
       await playerRef.current?.pause();
     } else {
       await playerRef.current?.play();
     }
-  }, [isPlaying]);
+  }, [isPlaying, resetControlsTimer]);
 
   const skipBack = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    resetControlsTimer();
     const target = Math.max(0, currentTime - 10);
     setCurrentTime(target);
     await playerRef.current?.seekTo(target);
-  }, [currentTime]);
+  }, [currentTime, resetControlsTimer]);
 
   const skipForward = useCallback(async () => {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    resetControlsTimer();
     const target = Math.min(duration || Infinity, currentTime + 10);
     setCurrentTime(target);
     await playerRef.current?.seekTo(target);
-  }, [currentTime, duration]);
+  }, [currentTime, duration, resetControlsTimer]);
 
   // ── YouTube sync actions ─────────────────────────────────────
 
@@ -507,6 +582,7 @@ export default function VideoPlayerScreen() {
   const handleSpeedSelect = useCallback(
     async (s: SpeedKey) => {
       void Haptics.selectionAsync();
+      resetControlsTimer();
       await setSpeed(s);
       const rate = Number(s);
       if (playerRef.current) {
@@ -515,7 +591,7 @@ export default function VideoPlayerScreen() {
         );
       }
     },
-    [setSpeed],
+    [setSpeed, resetControlsTimer],
   );
 
   // ── Poll current time & duration while the player is ready ─────
@@ -670,14 +746,24 @@ export default function VideoPlayerScreen() {
 
   return (
     <View style={styles.root}>
+      {/* Full-screen tap overlay — reveals controls when hidden */}
+      {controlsHidden && (
+        <Pressable
+          style={StyleSheet.absoluteFill}
+          onPress={resetControlsTimer}
+        />
+      )}
+
       {/* Chrome: hidden in fullscreen */}
       {!isFullscreen && (
         <>
           {/* Header */}
           <View style={[styles.header, { paddingTop: insets.top }]}>
-            <Pressable onPress={handleClose} hitSlop={12} style={styles.closeBtn}>
-              <X size={24} color={Colors.textPrimary} />
-            </Pressable>
+            <Animated.View style={{ opacity: controlsOpacity }}>
+              <Pressable onPress={handleClose} hitSlop={12} style={styles.closeBtn}>
+                <X size={24} color={Colors.textPrimary} />
+              </Pressable>
+            </Animated.View>
             <Text style={styles.headerTitle}>Video Player</Text>
             {/* Share icon */}
             <Pressable
@@ -704,12 +790,12 @@ export default function VideoPlayerScreen() {
           </View>
 
           {/* Speed pills row (embedded) */}
-          <View style={styles.embeddedControlsRow}>
+          <Animated.View style={[styles.embeddedControlsRow, { opacity: controlsOpacity }]}>
             <View style={styles.speedPillsWrapper}>
               {speedPillsRow}
             </View>
             {countdownPill}
-          </View>
+          </Animated.View>
 
           {/* Status actions */}
           <View style={styles.actionsRow}>
@@ -881,7 +967,7 @@ export default function VideoPlayerScreen() {
 
             {/* Transport overlay (embedded) */}
             {ready && (
-              <View style={styles.transportOverlay} pointerEvents="box-none">
+              <Animated.View style={[styles.transportOverlay, { opacity: controlsOpacity }]} pointerEvents="box-none">
                 <LinearGradient
                   colors={["transparent", "rgba(0,0,0,0.7)"]}
                   style={styles.transportGradient}
@@ -925,37 +1011,40 @@ export default function VideoPlayerScreen() {
                     <FastForward size={26} color={Colors.white} />
                   </Pressable>
                 </View>
-              </View>
+              </Animated.View>
             )}
           </View>
         )}
 
         {/* Fullscreen close button */}
         {isFullscreen && (
-          <Pressable
-            onPress={() => {
-              void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              exitFullscreen();
-              handleClose();
-            }}
-            style={[
-              styles.fullscreenCloseBtn,
-              { top: insets.top + 8 },
-            ]}
-            hitSlop={12}
-          >
-            <X size={22} color={Colors.white} />
-          </Pressable>
+          <Animated.View style={{ opacity: controlsOpacity }}>
+            <Pressable
+              onPress={() => {
+                void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                exitFullscreen();
+                handleClose();
+              }}
+              style={[
+                styles.fullscreenCloseBtn,
+                { top: insets.top + 8 },
+              ]}
+              hitSlop={12}
+            >
+              <X size={22} color={Colors.white} />
+            </Pressable>
+          </Animated.View>
         )}
       </View>
 
       {/* ── Progress / scrubber row ──────────────────────────── */}
       {ready && (
-        <View
+        <Animated.View
           style={[
             styles.progressRow,
             isFullscreen && styles.progressRowFullscreen,
             isFullscreen && { bottom: insets.bottom + 120 },
+            { opacity: controlsOpacity },
           ]}
         >
           <Text style={styles.progressTimeText}>
@@ -1008,15 +1097,16 @@ export default function VideoPlayerScreen() {
           >
             <Maximize size={18} color={Colors.textSecondary} />
           </Pressable>
-        </View>
+        </Animated.View>
       )}
 
       {/* ── Fullscreen bottom bar (transport + speed + countdown) ── */}
       {isFullscreen && ready && (
-        <View
+        <Animated.View
           style={[
             styles.fullscreenBottomBar,
             { paddingBottom: insets.bottom + 16 },
+            { opacity: controlsOpacity },
           ]}
           pointerEvents="box-none"
         >
@@ -1071,7 +1161,7 @@ export default function VideoPlayerScreen() {
             </View>
             {countdownPill}
           </View>
-        </View>
+        </Animated.View>
       )}
 
       {/* ── Share modal ───────────────────────────────────── */}
