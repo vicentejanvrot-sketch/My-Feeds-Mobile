@@ -221,7 +221,7 @@ const styles = StyleSheet.create({
   icon: {
     width: 64,
     height: 64,
-    borderRadius: 16,
+    aspectRatio: 1,
     marginBottom: 16,
   },
   title: {
