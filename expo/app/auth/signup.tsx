@@ -95,7 +95,7 @@ export default function SignUpScreen() {
       >
         <View style={[styles.card, isWide && styles.cardWide]}>
           <Image
-            source={require("@/assets/images/icon.png")}
+            source={require("@/assets/images/adaptive-icon.png")}
             style={styles.icon}
             resizeMode="contain"
           />

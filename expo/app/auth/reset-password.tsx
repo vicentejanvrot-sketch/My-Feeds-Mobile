@@ -104,7 +104,7 @@ export default function ResetPasswordScreen() {
         {/* Card */}
         <View style={[styles.card, isWide && styles.cardWide]}>
           <Image
-            source={require("@/assets/images/icon.png")}
+            source={require("@/assets/images/adaptive-icon.png")}
             style={styles.icon}
             resizeMode="contain"
           />

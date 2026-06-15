@@ -83,7 +83,7 @@ export default function LoginScreen() {
         <View style={[styles.card, isWide && styles.cardWide]}>
           {/* App icon */}
           <Image
-            source={require("@/assets/images/icon.png")}
+            source={require("@/assets/images/adaptive-icon.png")}
             style={styles.icon}
             resizeMode="contain"
           />
