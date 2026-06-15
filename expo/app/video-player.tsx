@@ -2072,6 +2072,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     maxHeight: "70%",
+    overflow: "hidden",
   },
   handleBar: {
     width: 36,
