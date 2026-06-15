@@ -2072,7 +2072,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingTop: 10,
     maxHeight: "70%",
-    overflow: "hidden",
+    // NOTE: do NOT add `overflow: "hidden"` here. On iOS, overflow:hidden +
+    // borderRadius renders a faint light/white anti-aliased hairline tracing
+    // the rounded corners. Content is already inset by paddingHorizontal (20 >
+    // 16px radius) and every row has its own inset + smaller radius, so no
+    // corner clipping is needed.
   },
   handleBar: {
     width: 36,
