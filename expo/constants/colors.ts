@@ -1,4 +1,4 @@
-// Daily Agent Digest — design system
+// My Feeds — design system
 // Deep navy command-center palette with sky-blue telemetry accents
 
 const HSL = (h: number, s: number, l: number) => `hsl(${h}, ${s}%, ${l}%)`;

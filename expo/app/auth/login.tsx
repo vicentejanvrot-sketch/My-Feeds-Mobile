@@ -89,7 +89,7 @@ export default function LoginScreen() {
           />
 
           {/* Title */}
-          <Text style={styles.title}>Daily Agent Digest</Text>
+          <Text style={styles.title}>My Feeds</Text>
 
           {/* Subtitle */}
           <Text style={styles.subtitle}>Sign in to your account to continue.</Text>

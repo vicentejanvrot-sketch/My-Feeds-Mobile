@@ -10,7 +10,7 @@ interface QA {
 const FAQ_DATA: QA[] = [
   {
     q: "What does this app do?",
-    a: "Daily Agent Digest lets you create research agents that monitor YouTube channels and playlists, automatically surface new videos into a Research Feed, and track which videos you've watched.",
+    a: "My Feeds lets you create research agents that monitor YouTube channels and playlists, automatically surface new videos into a Research Feed, and track which videos you've watched.",
   },
   {
     q: "Do I need a YouTube account?",

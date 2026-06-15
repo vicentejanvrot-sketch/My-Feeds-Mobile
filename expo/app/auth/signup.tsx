@@ -102,7 +102,7 @@ export default function SignUpScreen() {
 
           <Text style={styles.title}>Create Account</Text>
 
-          <Text style={styles.subtitle}>Sign up to start using Daily Agent Digest.</Text>
+          <Text style={styles.subtitle}>Sign up to start using My Feeds.</Text>
 
           {/* Email field */}
           <Text style={styles.label}>Email</Text>

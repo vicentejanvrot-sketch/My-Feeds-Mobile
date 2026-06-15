@@ -23,7 +23,7 @@ export default function TermsOfServiceScreen() {
       <Text style={styles.lastUpdated}>Last updated: June 10, 2026</Text>
 
       <Text style={styles.paragraph}>
-        These Terms of Service ("Terms") govern your use of Daily Agent Digest ("the app"). By downloading, accessing, or using the app, you agree to these Terms. If you do not agree, do not use the app.
+        These Terms of Service ("Terms") govern your use of My Feeds ("the app"). By downloading, accessing, or using the app, you agree to these Terms. If you do not agree, do not use the app.
       </Text>
 
       <Text style={styles.sectionHeading}>Use of the App</Text>
