@@ -1,6 +1,6 @@
-# Daily Agent Digest — Support
+# My Feeds — Support
 
-Need help with **Daily Agent Digest**? We're here for you.
+Need help with **My Feeds**? We're here for you.
 
 ## Contact
 
@@ -15,7 +15,7 @@ Open the app and tap **Create Account**. Enter your email and a password
 (at least 6 characters), and you'll be signed in right away.
 
 ### What does the app do?
-Daily Agent Digest lets you set up smart agents that track the channels and
+My Feeds lets you set up smart agents that track the channels and
 topics you care about, then delivers a focused daily digest of new videos
 along with watch-time stats.
 

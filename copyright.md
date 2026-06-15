@@ -2,7 +2,7 @@
 
 © 2026 Vicente Miranda. All rights reserved.
 
-**Daily Agent Digest** and its original content, features, and functionality
+**My Feeds** and its original content, features, and functionality
 are the property of Vicente Miranda and are protected by applicable copyright,
 trademark, and other intellectual property laws.
 

@@ -1,8 +1,8 @@
-# Daily Agent Digest
+# My Feeds
 
 ## Your AI-Powered Research Assistant
 
-Daily Agent Digest keeps you on top of the videos that matter — without the endless scrolling. Set up AI agents to monitor your favorite channels, and let them surface what's actually worth watching.
+My Feeds keeps you on top of the videos that matter — without the endless scrolling. Set up AI agents to monitor your favorite channels, and let them surface what's actually worth watching.
 
 ---
 
@@ -86,4 +86,4 @@ This TestFlight build is a beta release. Here's what we'd love your feedback on:
 
 If something doesn't work as expected, please let us know at support@travelone.ca. Include what you were doing, what happened, and what you expected to happen.
 
-Thank you for testing Daily Agent Digest!
+Thank you for testing My Feeds!

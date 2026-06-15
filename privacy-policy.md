@@ -2,7 +2,7 @@
 
 **Last updated: June 10, 2026**
 
-This Privacy Policy explains how Daily Agent Digest ("we", "us", or "the app") collects, uses, and protects your information. By using the app, you agree to the practices described here.
+This Privacy Policy explains how My Feeds ("we", "us", or "the app") collects, uses, and protects your information. By using the app, you agree to the practices described here.
 
 ## Information We Collect
 

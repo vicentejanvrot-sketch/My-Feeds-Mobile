@@ -1,7 +1,7 @@
 {
   "apps": [
     {
-      "name": "Daily Agent Digest",
+      "name": "My Feeds",
       "path": "expo",
       "framework": "react-native"
     }
