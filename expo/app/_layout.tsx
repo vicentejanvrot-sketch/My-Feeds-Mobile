@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
-import React, { useEffect } from "react";
-import { ActivityIndicator, Platform, Pressable, StyleSheet, Text, View } from "react-native";
+import React, { useEffect, useRef, useState } from "react";
+import { ActivityIndicator, Animated, Image, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { ChevronLeft } from "lucide-react-native";
 import { AuthProvider, useAuth } from "@/lib/auth-provider";
@@ -42,6 +42,35 @@ function useWebGlobalStyles(): void {
     `;
     document.head.appendChild(style);
   }, []);
+}
+
+/**
+ * Full-screen branded splash that stays visible for a fixed 3 seconds after the
+ * app is ready, then fades out to reveal the underlying screen (login or tabs).
+ */
+function TimedSplash({ onDone }: { onDone: () => void }) {
+  const opacity = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      Animated.timing(opacity, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: Platform.OS !== "web",
+      }).start(() => onDone());
+    }, 3000);
+    return () => clearTimeout(timer);
+  }, [opacity, onDone]);
+
+  return (
+    <Animated.View style={[styles.splash, { opacity }]} pointerEvents="none">
+      <Image
+        source={require("@/assets/images/splash-screen.png")}
+        style={styles.splashImage}
+        resizeMode="contain"
+      />
+    </Animated.View>
+  );
 }
 
 function AuthGate() {
@@ -148,6 +177,8 @@ function AuthGate() {
 
 export default function RootLayout() {
   useWebGlobalStyles();
+  const [splashDone, setSplashDone] = useState<boolean>(false);
+
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
@@ -158,6 +189,9 @@ export default function RootLayout() {
                 <AuthGate />
                 <ToastHost />
                 <RunningOverlay />
+                {!splashDone ? (
+                  <TimedSplash onDone={() => setSplashDone(true)} />
+                ) : null}
               </GestureHandlerRootView>
             </ToastProvider>
           </RunningOverlayProvider>
@@ -176,6 +210,17 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     alignItems: "center",
     justifyContent: "center",
+  },
+  splash: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "#000108",
+    alignItems: "center",
+    justifyContent: "center",
+    zIndex: 9999,
+  },
+  splashImage: {
+    width: "100%",
+    height: "100%",
   },
   backBtn: {
     flexDirection: "row" as const,
