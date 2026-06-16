@@ -1745,6 +1745,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.black,
     overflow: "hidden",
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#565656",
   },
   fullscreenPlayerWrapper: {
     ...StyleSheet.absoluteFillObject,
