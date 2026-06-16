@@ -1671,7 +1671,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.background,
     borderWidth: 1,
     borderColor: "#565656",
-    borderRadius: 24,
+    borderRadius: 10,
     overflow: "hidden",
   },
   tapOverlay: {
