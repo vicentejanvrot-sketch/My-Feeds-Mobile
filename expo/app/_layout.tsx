@@ -104,7 +104,11 @@ function AuthGate() {
         />
         <Stack.Screen
           name="video-player"
-          options={{ presentation: "modal", headerShown: false }}
+          options={{
+            presentation: "modal",
+            headerShown: false,
+            contentStyle: { backgroundColor: Colors.background },
+          }}
         />
         <Stack.Screen
           name="support/faq"
