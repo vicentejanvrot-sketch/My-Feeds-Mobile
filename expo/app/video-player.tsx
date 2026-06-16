@@ -1669,6 +1669,10 @@ const styles = StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: Colors.background,
+    borderWidth: 1,
+    borderColor: "#565656",
+    borderRadius: 16,
+    overflow: "hidden",
   },
   tapOverlay: {
     zIndex: 9999,
@@ -1745,8 +1749,6 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.black,
     overflow: "hidden",
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#565656",
   },
   fullscreenPlayerWrapper: {
     ...StyleSheet.absoluteFillObject,
