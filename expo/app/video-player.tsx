@@ -919,12 +919,12 @@ export default function VideoPlayerScreen() {
   // ── Normal: player with transport overlay ───────────────────────
 
   return (
-    <View style={styles.root}>
+    <View style={[styles.root, !isFullscreen && { marginTop: insets.top }]}>
       {/* Chrome: hidden in fullscreen */}
       {!isFullscreen && (
         <>
           {/* Header */}
-          <View style={[styles.header, { paddingTop: insets.top }]}>
+          <View style={[styles.header, { paddingTop: 12 }]}>
             <Animated.View style={{ opacity: controlsOpacity }}>
               <Pressable onPress={handleClose} hitSlop={12} style={styles.closeBtn}>
                 <X size={24} color={Colors.textPrimary} />
