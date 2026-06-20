@@ -471,6 +471,71 @@ export function useRealtimeInvalidation(
   }, [table, user, enabled]);
 }
 
+/**
+ * Dashboard-specific realtime subscription that listens for completed runs
+ * and invalidates the agent, run, and item query caches so the
+ * "My Feeds" and "My Agents" cards auto-refresh.
+ *
+ * Subscribes to the RLS-authorized channel `dashboard-runs-{userId}`
+ * and only acts on finished runs (success, partial, failed).
+ */
+export function useDashboardRealtime(enabled = true) {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+
+  useEffect(() => {
+    // Tear down any previous channel before deciding what to do.
+    if (channelRef.current) {
+      void supabase.removeChannel(channelRef.current);
+      channelRef.current = null;
+    }
+
+    // Only subscribe when a user is signed in and enabled.
+    if (!user?.id || !enabled) return;
+
+    const channel = supabase.channel(`dashboard-runs-${user.id}`);
+
+    const handleChange = (payload: {
+      new?: Record<string, unknown>;
+      old?: Record<string, unknown>;
+    }) => {
+      const status = payload.new?.status;
+      if (
+        status === "success" ||
+        status === "partial" ||
+        status === "failed"
+      ) {
+        void queryClient.invalidateQueries({ queryKey: qk.agents });
+        void queryClient.invalidateQueries({ queryKey: qk.runs });
+        void queryClient.invalidateQueries({ queryKey: ["items"] });
+      }
+    };
+
+    channel.on(
+      "postgres_changes",
+      { event: "INSERT", schema: "public", table: "runs" },
+      handleChange,
+    );
+
+    channel.on(
+      "postgres_changes",
+      { event: "UPDATE", schema: "public", table: "runs" },
+      handleChange,
+    );
+
+    channel.subscribe();
+    channelRef.current = channel;
+
+    return () => {
+      if (channelRef.current) {
+        void supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
+    };
+  }, [user?.id, enabled]);
+}
+
 /** Toggle a channel's is_enabled flag. */
 export function useToggleChannel() {
   const queryClient = useQueryClient();

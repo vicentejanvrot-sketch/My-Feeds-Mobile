@@ -40,7 +40,7 @@ import {
   useChannelsAll,
   useStartRun,
   useDeleteAgent,
-  useRealtimeInvalidation,
+  useDashboardRealtime,
   useAgentItemCounts,
   getAgentColor,
   qk,
@@ -71,8 +71,7 @@ export default function DashboardScreen() {
   const overlay = useRunningOverlay();
   const queryClient = useQueryClient();
 
-  useRealtimeInvalidation("runs", qk.runs, !overlay.state.status);
-  useRealtimeInvalidation("items", qk.items("all"), !overlay.state.status);
+  useDashboardRealtime(!overlay.state.status);
 
   const [pendingId, setPendingId] = useState<string | null>(null);
 
