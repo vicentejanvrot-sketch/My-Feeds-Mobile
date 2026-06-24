@@ -30,52 +30,87 @@ export const qk = {
 /**
  * Extract the actual error message from a Supabase Edge Function invoke error.
  *
- * Supabase wraps non-2xx responses in a FunctionsHttpError whose `.message` is
- * always the generic "Edge Function returned a non-2xx status code". The real
- * error the Edge Function returned lives in `context`, which is the raw Response.
+ * Supabase wraps failures in one of three error classes (all extend FunctionsError):
+ *   - FunctionsHttpError  — non-2xx status; `context` is the raw Response.
+ *   - FunctionsRelayError  — relay layer failure; `context` is a relay payload.
+ *   - FunctionsFetchError  — network / fetch failure; `context` is a fetch payload.
  *
- * This helper reads the JSON body from that Response and returns the `error` or
- * `message` field. If the body can't be parsed, it falls back to the generic
- * message so the app never breaks on a malformed error.
+ * Only FunctionsHttpError carries a readable Response body; the other two have
+ * plain-object contexts without .json() or .text(). This helper handles all three
+ * and always surfaces the most diagnostic message available.
  */
 export async function extractEdgeFunctionErrorMessage(
   err: unknown,
 ): Promise<string> {
-  // FunctionsHttpError carries the Response in `context`.
-  const ctx = (err as { context?: unknown })?.context;
-
-  // Helper: try to read the error body as text (used both as the JSON fallback
-  // and when the response isn't JSON at all).
-  const tryReadText = async (): Promise<string | null> => {
-    if (ctx && typeof (ctx as { text?: unknown }).text === "function") {
-      try {
-        const text = await (ctx as Response).text();
-        if (text && text.trim().length > 0) return text.trim();
-      } catch {
-        // Text read also failed — give up.
-      }
-    }
-    return null;
+  const errObj = err as {
+    message?: string;
+    name?: string;
+    context?: unknown;
   };
+  const ctx = errObj.context;
 
-  if (ctx && typeof (ctx as { json?: unknown }).json === "function") {
+  // ── Case 1: FunctionsHttpError — context is a Response ──────────
+  // A Response always has both .status (number) and .json() (method).
+  const isResponse =
+    ctx !== undefined &&
+    ctx !== null &&
+    typeof (ctx as Record<string, unknown>).status === "number" &&
+    typeof (ctx as Record<string, unknown>).json === "function";
+
+  if (isResponse) {
+    const resp = ctx as Response;
+    const status = resp.status;
+    // Response.statusText may be empty on some runtimes (React Native, Node).
+    const statusLabel = resp.statusText
+      ? `${status} ${resp.statusText}`
+      : `${status}`;
+
+    // Try JSON body first (the Edge Function convention).
     try {
-      const body = await (ctx as Response).json();
+      const body = await resp.json();
       if (typeof body === "object" && body !== null) {
-        // Edge Function convention: { error: "..." } or { message: "..." }
         const b = body as Record<string, unknown>;
         if (typeof b.error === "string" && b.error.length > 0) return b.error;
         if (typeof b.message === "string" && b.message.length > 0) return b.message;
       }
     } catch {
-      // JSON parse threw — body may be plain text (e.g. an uncaught stack
-      // trace or a 500 HTML page). Fall back to reading it as raw text.
-      const text = await tryReadText();
-      if (text) return text;
+      // JSON parse failed — body may be plain text (uncaught stack trace,
+      // 502 HTML page, or empty).
     }
+
+    // Fall back to raw text body.
+    try {
+      const text = await resp.text();
+      if (text && text.trim().length > 0) return text.trim();
+    } catch {
+      // Body stream already consumed or unreadable.
+    }
+
+    // Body was empty or unreadable — surface the HTTP status at minimum.
+    return `Edge Function returned ${statusLabel} (no error details available)`;
   }
 
-  return (err as { message?: string })?.message ?? "Edge Function returned a non-2xx status code";
+  // ── Case 2: FunctionsRelayError or FunctionsFetchError ──────────
+  // These have a plain-object context (no .json()), but the error's own
+  // .message may carry useful diagnostics (e.g. "Failed to fetch", relay
+  // region info). Include the error class name so we can tell them apart.
+  if (ctx !== undefined && ctx !== null) {
+    const name = errObj.name ?? "FunctionsError";
+    const msg = errObj.message ?? "";
+    // The generic message is always "Edge Function returned a non-2xx status
+    // code" for HttpError; RelayError / FetchError have distinct messages.
+    if (msg.length > 0 && msg !== "Edge Function returned a non-2xx status code") {
+      return `[${name}] ${msg}`;
+    }
+    return `[${name}] ${JSON.stringify(ctx)}`;
+  }
+
+  // ── Case 3: No context at all (should be rare) ───────────────────
+  const msg = errObj.message;
+  if (msg && msg !== "Edge Function returned a non-2xx status code") {
+    return msg;
+  }
+  return "Edge Function returned a non-2xx status code";
 }
 
 /** All agents owned by the current user. */
