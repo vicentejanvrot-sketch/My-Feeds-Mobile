@@ -27,6 +27,57 @@ export const qk = {
   safeSettings: ["user_settings_safe"] as const,
 };
 
+/**
+ * Extract the actual error message from a Supabase Edge Function invoke error.
+ *
+ * Supabase wraps non-2xx responses in a FunctionsHttpError whose `.message` is
+ * always the generic "Edge Function returned a non-2xx status code". The real
+ * error the Edge Function returned lives in `context`, which is the raw Response.
+ *
+ * This helper reads the JSON body from that Response and returns the `error` or
+ * `message` field. If the body can't be parsed, it falls back to the generic
+ * message so the app never breaks on a malformed error.
+ */
+export async function extractEdgeFunctionErrorMessage(
+  err: unknown,
+): Promise<string> {
+  // FunctionsHttpError carries the Response in `context`.
+  const ctx = (err as { context?: unknown })?.context;
+
+  // Helper: try to read the error body as text (used both as the JSON fallback
+  // and when the response isn't JSON at all).
+  const tryReadText = async (): Promise<string | null> => {
+    if (ctx && typeof (ctx as { text?: unknown }).text === "function") {
+      try {
+        const text = await (ctx as Response).text();
+        if (text && text.trim().length > 0) return text.trim();
+      } catch {
+        // Text read also failed — give up.
+      }
+    }
+    return null;
+  };
+
+  if (ctx && typeof (ctx as { json?: unknown }).json === "function") {
+    try {
+      const body = await (ctx as Response).json();
+      if (typeof body === "object" && body !== null) {
+        // Edge Function convention: { error: "..." } or { message: "..." }
+        const b = body as Record<string, unknown>;
+        if (typeof b.error === "string" && b.error.length > 0) return b.error;
+        if (typeof b.message === "string" && b.message.length > 0) return b.message;
+      }
+    } catch {
+      // JSON parse threw — body may be plain text (e.g. an uncaught stack
+      // trace or a 500 HTML page). Fall back to reading it as raw text.
+      const text = await tryReadText();
+      if (text) return text;
+    }
+  }
+
+  return (err as { message?: string })?.message ?? "Edge Function returned a non-2xx status code";
+}
+
 /** All agents owned by the current user. */
 export function useAgents() {
   const { user } = useAuth();
@@ -371,7 +422,7 @@ export function useRunAgent() {
           .update({
             status: "failed",
             finished_at: new Date().toISOString(),
-            error_summary: invokeError.message,
+            error_summary: await extractEdgeFunctionErrorMessage(invokeError),
           })
           .eq("id", runRow.id);
         throw invokeError;

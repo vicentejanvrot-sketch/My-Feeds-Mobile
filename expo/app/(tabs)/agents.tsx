@@ -17,7 +17,7 @@ import { Play, Clock, Tags, Mail } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
 import { agentAccent } from "@/lib/database";
-import { useAgents, useStartRun, useRealtimeInvalidation, qk } from "@/lib/hooks";
+import { useAgents, useStartRun, useRealtimeInvalidation, qk, extractEdgeFunctionErrorMessage } from "@/lib/hooks";
 import { supabase } from "@/lib/supabase";
 import { useRunningOverlay } from "@/lib/running-overlay";
 import { useToast } from "@/components/Toast";
@@ -64,10 +64,10 @@ export default function AgentsScreen() {
           .update({
             status: "failed",
             finished_at: new Date().toISOString(),
-            error_summary: error.message,
+            error_summary: await extractEdgeFunctionErrorMessage(error),
           })
           .eq("id", run.id);
-        overlay.showError(agentName, error.message);
+        overlay.showError(agentName, await extractEdgeFunctionErrorMessage(error));
         void queryClient.invalidateQueries({ queryKey: qk.runs });
         return;
       }

@@ -44,6 +44,7 @@ import {
   useAgentItemCounts,
   getAgentColor,
   qk,
+  extractEdgeFunctionErrorMessage,
 } from "@/lib/hooks";
 import { supabase } from "@/lib/supabase";
 import { timeAgo, relativeTime, compactNumber } from "@/lib/format";
@@ -155,10 +156,10 @@ export default function DashboardScreen() {
           .update({
             status: "failed",
             finished_at: new Date().toISOString(),
-            error_summary: error.message,
+            error_summary: await extractEdgeFunctionErrorMessage(error),
           })
           .eq("id", run.id);
-        overlay.showError(agentName, error.message);
+        overlay.showError(agentName, await extractEdgeFunctionErrorMessage(error));
         void queryClient.invalidateQueries({ queryKey: qk.runs });
         return;
       }

@@ -57,6 +57,7 @@ import {
   useRunItemCounts,
   useRealtimeInvalidation,
   qk,
+  extractEdgeFunctionErrorMessage,
 } from "@/lib/hooks";
 import { supabase } from "@/lib/supabase";
 import { useRunningOverlay } from "@/lib/running-overlay";
@@ -595,10 +596,10 @@ export default function AgentDetailScreen() {
           .update({
             status: "failed",
             finished_at: new Date().toISOString(),
-            error_summary: error.message,
+            error_summary: await extractEdgeFunctionErrorMessage(error),
           })
           .eq("id", run.id);
-        overlay.showError(aName, error.message);
+        overlay.showError(aName, await extractEdgeFunctionErrorMessage(error));
         void queryClient.invalidateQueries({ queryKey: qk.runs });
         return;
       }
