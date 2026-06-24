@@ -348,7 +348,6 @@ export function useUpdateSettings() {
 
   /** Maximum character lengths per key column. */
   const KEY_MAX_LENGTHS: Record<string, number> = {
-    youtube_api_key: 100,
     openai_api_key: 200,
     anthropic_api_key: 200,
     gemini_api_key: 200,
@@ -433,8 +432,15 @@ export function useUserSettingsSafe() {
  */
 export function useRunAgent() {
   const queryClient = useQueryClient();
+  const { user, status: authStatus } = useAuth();
   return useMutation({
     mutationFn: async (agentId: string) => {
+      // Guard: bail out early with a clear message when there is no session.
+      // This prevents supabase.functions.invoke from sending an anon-only
+      // request (no JWT) that surfaces an opaque HTTP error downstream.
+      if (authStatus === "unauthenticated" || !user) {
+        throw new Error("Not signed in — please sign in before running an agent.");
+      }
       const now = new Date().toISOString();
 
       // 1. Insert run row

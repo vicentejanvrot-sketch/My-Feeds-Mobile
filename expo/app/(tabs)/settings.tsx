@@ -53,7 +53,7 @@ import { openExternalLink } from "@/lib/open-link";
 
 
 interface KeyDef {
-  key: "youtube_api_key" | "openai_api_key" | "anthropic_api_key" | "gemini_api_key";
+  key: "openai_api_key" | "anthropic_api_key" | "gemini_api_key";
   label: string;
   helper: string;
   linkUrl: string;
@@ -61,13 +61,6 @@ interface KeyDef {
 }
 
 const KEY_DEFS: KeyDef[] = [
-  {
-    key: "youtube_api_key",
-    label: "YouTube Data API Key",
-    helper: "Required for fetching YouTube channel and video data.",
-    linkUrl: "https://console.cloud.google.com/apis/credentials",
-    maxLen: 100,
-  },
   {
     key: "openai_api_key",
     label: "OpenAI API Key",
@@ -120,7 +113,6 @@ export default function SettingsScreen() {
 
   const [defaultEmail, setDefaultEmail] = useState("");
   const [keys, setKeys] = useState<Record<string, string>>({
-    youtube_api_key: "",
     openai_api_key: "",
     anthropic_api_key: "",
     gemini_api_key: "",
@@ -147,7 +139,6 @@ export default function SettingsScreen() {
     const row = safeSettings.data;
     if (!row) return false;
     const flagMap: Record<string, boolean | undefined> = {
-      youtube_api_key: row.has_youtube_key,
       openai_api_key: row.has_openai_key,
       anthropic_api_key: row.has_anthropic_key,
       gemini_api_key: row.has_gemini_key,
@@ -159,7 +150,6 @@ export default function SettingsScreen() {
     const row = safeSettings.data;
     if (!row) return null;
     const maskMap: Record<string, string | null | undefined> = {
-      youtube_api_key: row.youtube_api_key_masked,
       openai_api_key: row.openai_api_key_masked,
       anthropic_api_key: row.anthropic_api_key_masked,
       gemini_api_key: row.gemini_api_key_masked,
@@ -297,7 +287,6 @@ export default function SettingsScreen() {
       showToast("Settings saved.", "success");
       // Clear key inputs so they aren't accidentally re-submitted
       setKeys({
-        youtube_api_key: "",
         openai_api_key: "",
         anthropic_api_key: "",
         gemini_api_key: "",
