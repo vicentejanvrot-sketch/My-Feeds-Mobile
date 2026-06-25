@@ -35,7 +35,7 @@ import {
   useAddRecipient,
   useDeleteRecipient,
 } from "@/lib/hooks";
-import { AI_PROVIDERS, TIMEZONES, type AiProvider } from "@/lib/database";
+import { TIMEZONES } from "@/lib/database";
 import { useToast } from "@/components/Toast";
 import type { Agent } from "@/lib/database";
 
@@ -110,7 +110,6 @@ export default function AgentFormScreen() {
   const [runTime, setRunTime] = useState("07:00");
   const [timezone, setTimezone] = useState("America/Edmonton");
   const [lookbackHours, setLookbackHours] = useState("36");
-  const [aiProvider, setAiProvider] = useState<AiProvider>("lovable");
   const [includeShorts, setIncludeShorts] = useState(false);
   const [includeLive, setIncludeLive] = useState(false);
   const [minDuration, setMinDuration] = useState(3);
@@ -127,7 +126,6 @@ export default function AgentFormScreen() {
 
   // dropdowns
   const [tzOpen, setTzOpen] = useState(false);
-  const [aiOpen, setAiOpen] = useState(false);
 
   // derived time parts for the three dropdowns
   const { hour: runHour, minute: runMinute, ampm: runAmPm } = useMemo(
@@ -172,7 +170,6 @@ export default function AgentFormScreen() {
     setRunTime(agent.run_time_local ?? "07:00");
     setTimezone(agent.timezone ?? "America/Edmonton");
     setLookbackHours(String(agent.lookback_hours ?? 36));
-    setAiProvider((agent.ai_provider as AiProvider) ?? "lovable");
     setIncludeShorts(agent.include_shorts ?? false);
     setIncludeLive(agent.include_live ?? false);
     setMinDuration(agent.min_duration_minutes ?? 3);
@@ -227,7 +224,7 @@ export default function AgentFormScreen() {
         run_time_local: runTime,
         timezone,
         lookback_hours: Number(lookbackHours) || 36,
-        ai_provider: aiProvider,
+        ai_provider: "lovable" as const,
         include_shorts: includeShorts,
         include_live: includeLive,
         min_duration_minutes: minDuration,
@@ -296,7 +293,7 @@ export default function AgentFormScreen() {
       setSaving(false);
     }
   }, [
-    name, description, runTime, timezone, lookbackHours, aiProvider,
+    name, description, runTime, timezone, lookbackHours,
     includeShorts, includeLive, minDuration, freshnessWeight, priorityWeight,
     durationWeight, keywordWeight, keywords, recipients, isEdit, agentId,
     createAgent, updateAgent, deleteRecipient, showToast, router,
@@ -485,20 +482,8 @@ export default function AgentFormScreen() {
             value={timezone}
             options={[...TIMEZONES]}
             open={tzOpen}
-            onToggle={() => { setTzOpen((v) => !v); setAiOpen(false); }}
+            onToggle={() => { setTzOpen((v) => !v); }}
             onSelect={(v) => { setTimezone(v); setTzOpen(false); }}
-          />
-        </FormSection>
-
-        {/* ── AI Provider ──────────────────────────────────────────── */}
-        <FormSection title='AI Provider — "Which AI should generate video summaries?"'>
-          <Dropdown
-            value={aiProvider}
-            options={AI_PROVIDERS.map((p) => p.value)}
-            labels={Object.fromEntries(AI_PROVIDERS.map((p) => [p.value, p.label]))}
-            open={aiOpen}
-            onToggle={() => { setAiOpen((v) => !v); setTzOpen(false); }}
-            onSelect={(v) => { setAiProvider(v as AiProvider); setAiOpen(false); }}
           />
         </FormSection>
 

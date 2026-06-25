@@ -346,39 +346,13 @@ export function useUpdateSettings() {
   const queryClient = useQueryClient();
   const { user } = useAuth();
 
-  /** Maximum character lengths per key column. */
-  const KEY_MAX_LENGTHS: Record<string, number> = {
-    openai_api_key: 200,
-    anthropic_api_key: 200,
-    gemini_api_key: 200,
-  };
-
   return useMutation({
     mutationFn: async (patch: Partial<UserSettings>) => {
       const payload: Record<string, unknown> = { user_id: user?.id };
 
       for (const [k, v] of Object.entries(patch)) {
         if (v == null || v === "") continue;
-
-        if (k in KEY_MAX_LENGTHS) {
-          const trimmed = String(v).trim();
-          if (!trimmed) continue;
-
-          if (trimmed.length < 10) {
-            throw new Error(`${k} is too short (minimum 10 characters).`);
-          }
-          if (trimmed.length > KEY_MAX_LENGTHS[k]) {
-            throw new Error(
-              `${k} is too long (maximum ${KEY_MAX_LENGTHS[k]} characters).`,
-            );
-          }
-          if (/[\s\u0000-\u001F\u007F-\u009F]/.test(trimmed)) {
-            throw new Error(`${k} contains invalid characters.`);
-          }
-          payload[k] = trimmed;
-        } else {
-          payload[k] = v;
-        }
+        payload[k] = v;
       }
 
       // Nothing to persist beyond the user_id anchor.

@@ -22,16 +22,11 @@ import * as Haptics from "expo-haptics";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import {
-  KeyRound,
-  Link2,
   Mail,
   Monitor,
-  Eye,
-  EyeOff,
   Save,
   ChevronDown,
   LogOut,
-  Unlink,
   User,
   ChevronRight,
   CircleHelp,
@@ -42,56 +37,14 @@ import {
 } from "lucide-react-native";
 import { Colors } from "@/constants/colors";
 import { useAuth } from "@/lib/auth-provider";
-import { useUserSettings, useUpdateSettings, useUserSettingsSafe, useDeleteAccount, useDeleteApiKey } from "@/lib/hooks";
+import { useUserSettings, useUpdateSettings, useUserSettingsSafe, useDeleteAccount } from "@/lib/hooks";
 import { useToast } from "@/components/Toast";
-import { useYouTubeConnection } from "@/lib/useYouTubeConnection";
 import { useVideoQuality, QUALITY_KEYS, QUALITY_LABELS } from "@/lib/useVideoQuality";
-import { openExternalLink } from "@/lib/open-link";
-
 // ── Constants ─────────────────────────────────────────────────────
-
-
-
-interface KeyDef {
-  key: "openai_api_key" | "anthropic_api_key" | "gemini_api_key";
-  label: string;
-  helper: string;
-  linkUrl: string;
-  maxLen: number;
-}
-
-const KEY_DEFS: KeyDef[] = [
-  {
-    key: "openai_api_key",
-    label: "OpenAI API Key",
-    helper: "Used for AI analysis and video enrichment.",
-    linkUrl: "https://platform.openai.com/api-keys",
-    maxLen: 200,
-  },
-  {
-    key: "anthropic_api_key",
-    label: "Anthropic API Key",
-    helper: "Used for AI analysis and video enrichment.",
-    linkUrl: "https://console.anthropic.com/settings/keys",
-    maxLen: 200,
-  },
-  {
-    key: "gemini_api_key",
-    label: "Gemini API Key",
-    helper: "Used for AI analysis and video enrichment.",
-    linkUrl: "https://aistudio.google.com/app/apikey",
-    maxLen: 200,
-  },
-];
 
 /** Minimal email format check — matches the web app's validator. */
 function isValidEmail(v: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
-}
-
-/** Reject strings with whitespace or control characters. */
-function hasBadChars(v: string): boolean {
-  return /[\s\u0000-\u001F\u007F-\u009F]/.test(v);
 }
 
 // ── Component ─────────────────────────────────────────────────────
@@ -112,17 +65,8 @@ export default function SettingsScreen() {
   // ── Form state ────────────────────────────────────────────────
 
   const [defaultEmail, setDefaultEmail] = useState("");
-  const [keys, setKeys] = useState<Record<string, string>>({
-    openai_api_key: "",
-    anthropic_api_key: "",
-    gemini_api_key: "",
-  });
-  const [visibleKeys, setVisibleKeys] = useState<Record<string, boolean>>({});
 
-  // YouTube connection state
-  const yt = useYouTubeConnection();
   const deleteAccount = useDeleteAccount();
-  const deleteKey = useDeleteApiKey();
 
   // Shared video quality pref (synced with in-player gear menu)
   const { quality: videoQuality, setQuality: persistQuality, ready: qualityReady } = useVideoQuality();
@@ -133,31 +77,7 @@ export default function SettingsScreen() {
   const [accordionOpen, setAccordionOpen] = useState(false);
   const accordionAnim = useRef(new Animated.Value(0)).current;
 
-  // ── Helper: key status from safe view ──────────────────────────
-
-  const keySaved = (def: KeyDef): boolean => {
-    const row = safeSettings.data;
-    if (!row) return false;
-    const flagMap: Record<string, boolean | undefined> = {
-      openai_api_key: row.has_openai_key,
-      anthropic_api_key: row.has_anthropic_key,
-      gemini_api_key: row.has_gemini_key,
-    };
-    return flagMap[def.key] ?? false;
-  };
-
-  const keyMasked = (def: KeyDef): string | null => {
-    const row = safeSettings.data;
-    if (!row) return null;
-    const maskMap: Record<string, string | null | undefined> = {
-      openai_api_key: row.openai_api_key_masked,
-      anthropic_api_key: row.anthropic_api_key_masked,
-      gemini_api_key: row.gemini_api_key_masked,
-    };
-    return maskMap[def.key] ?? null;
-  };
-
-  // ── Load Supabase settings (email + metadata only — NEVER keys) ─
+  // ── Load Supabase settings (email + metadata only) ─
 
   useEffect(() => {
     if (settings.data) {
@@ -225,19 +145,6 @@ export default function SettingsScreen() {
     [persistQuality],
   );
 
-  // ── Open link handler ─────────────────────────────────────────
-
-  const handleOpenLink = useCallback(
-    async (url: string) => {
-      try {
-        await openExternalLink(url);
-      } catch {
-        showToast("Couldn't open link", "error");
-      }
-    },
-    [showToast],
-  );
-
   // ── Save handler ───────────────────────────────────────────────
 
   const handleSave = useCallback(async () => {
@@ -250,55 +157,20 @@ export default function SettingsScreen() {
       return;
     }
 
-    // Validate keys
-    for (const def of KEY_DEFS) {
-      const val = (keys[def.key] ?? "").trim();
-      if (!val) continue;
-      if (hasBadChars(val)) {
-        showToast(`${def.label} contains invalid characters.`, "error");
-        return;
-      }
-      if (val.length < 10) {
-        showToast(`${def.label} is too short (minimum 10 characters).`, "error");
-        return;
-      }
-      if (val.length > def.maxLen) {
-        showToast(`${def.label} is too long (maximum ${def.maxLen} characters).`, "error");
-        return;
-      }
-    }
-
-    // Build payload — skip empty key fields entirely so they don't
-    // overwrite existing stored keys with blanks.
     const payload: Record<string, string | null> = {
       default_email: email || null,
     };
 
-    for (const def of KEY_DEFS) {
-      const val = (keys[def.key] ?? "").trim();
-      if (val) {
-        payload[def.key] = val;
-      }
-      // empty → omitted (write-only security model)
-    }
-
     try {
       await updateSettings.mutateAsync(payload as any);
       showToast("Settings saved.", "success");
-      // Clear key inputs so they aren't accidentally re-submitted
-      setKeys({
-        openai_api_key: "",
-        anthropic_api_key: "",
-        gemini_api_key: "",
-      });
-      setVisibleKeys({});
     } catch (err: any) {
       showToast(
         err?.message ?? "Failed to save settings. Please try again.",
         "error",
       );
     }
-  }, [defaultEmail, keys, updateSettings, showToast]);
+  }, [defaultEmail, updateSettings, showToast]);
 
   // ── Render ─────────────────────────────────────────────────────
 
@@ -327,66 +199,6 @@ export default function SettingsScreen() {
           </View>
         </View>
 
-        {/* ── YouTube Connection ──────────────────────── */}
-        {yt.status !== "loading" && (
-          <View style={styles.card}>
-            <View style={styles.cardHeader}>
-              <View style={styles.youtubeBadge}>
-                <Text style={styles.youtubeBadgeText}>YT</Text>
-              </View>
-              <Text style={styles.cardTitle}>YouTube</Text>
-            </View>
-            {yt.status === "connected" ? (
-              <>
-                <Text style={styles.cardDesc}>
-                  Connected as{" "}
-                  <Text style={styles.connectedName}>
-                    {yt.channelName ?? "YouTube channel"}
-                  </Text>
-                </Text>
-                <Text style={styles.helperText}>
-                  Your video actions (Watched, Liked, Watch Later) will sync to
-                  your YouTube account.
-                </Text>
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.youtubeDisconnectBtn,
-                    pressed && styles.pressed,
-                  ]}
-                  onPress={() => yt.disconnect()}
-                >
-                  <Unlink size={15} color={Colors.destructive} />
-                  <Text style={styles.youtubeDisconnectText}>Disconnect</Text>
-                </Pressable>
-              </>
-            ) : (
-              <>
-                <Text style={styles.cardDesc}>
-                  Connect your YouTube account to sync playlists, history, and
-                  video actions.
-                </Text>
-                {yt.error ? (
-                  <Text style={styles.errorText}>{yt.error}</Text>
-                ) : null}
-                <Pressable
-                  style={({ pressed }) => [
-                    styles.youtubeConnectBtn,
-                    pressed && styles.youtubeConnectPressed,
-                  ]}
-                  onPress={() => yt.connect()}
-                >
-                  <Link2 size={15} color={Colors.white} />
-                  <Text style={styles.youtubeConnectText}>
-                    Connect YouTube
-                  </Text>
-                </Pressable>
-                <Text style={styles.helperText}>
-                  Sync playlists &amp; history
-                </Text>
-              </>
-            )}
-          </View>
-        )}
 
         {settings.isLoading ? (
           <View style={styles.loadingBox}>
@@ -394,118 +206,7 @@ export default function SettingsScreen() {
           </View>
         ) : (
           <>
-            {/* ═══ Card 1: API Keys ═══ */}
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <KeyRound size={18} color={Colors.accent} />
-                <Text style={styles.cardTitle}>API Keys</Text>
-              </View>
-              <Text style={styles.cardDesc}>
-                Configure your API keys for YouTube data and AI providers. Keys are stored securely.
-              </Text>
-
-              {KEY_DEFS.map((def) => {
-                const saved = keySaved(def);
-                const masked = keyMasked(def);
-                return (
-                <View key={def.key} style={styles.fieldGroup}>
-                  <View style={styles.fieldLabelRow}>
-                    <Text style={styles.fieldLabel}>{def.label}</Text>
-                    {saved && (
-                      <>
-                        <View style={styles.keySavedBadge}>
-                          <Text style={styles.keySavedBadgeText}>Saved</Text>
-                        </View>
-                        <Pressable
-                          style={({ pressed }) => [
-                            styles.keyDeleteBtn,
-                            pressed && styles.keyDeleteBtnPressed,
-                            deleteKey.isPending && styles.disabled,
-                          ]}
-                          onPress={() => {
-                            void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            Alert.alert(
-                              `Delete ${def.label}?`,
-                              "This will remove the saved key. You can enter a new one at any time.",
-                              [
-                                { text: "Cancel", style: "cancel" },
-                                {
-                                  text: "Delete",
-                                  style: "destructive",
-                                  onPress: async () => {
-                                    try {
-                                      await deleteKey.mutateAsync(def.key);
-                                      showToast(`${def.label} removed.`, "success");
-                                    } catch (err: any) {
-                                      showToast(
-                                        err?.message ?? "Failed to delete key.",
-                                        "error",
-                                      );
-                                    }
-                                  },
-                                },
-                              ],
-                            );
-                          }}
-                          hitSlop={6}
-                        >
-                          <Trash2 size={13} color={Colors.destructive} />
-                        </Pressable>
-                      </>
-                    )}
-                  </View>
-                  {masked && (
-                    <Text style={styles.keyMaskedText} numberOfLines={1}>
-                      {masked}
-                    </Text>
-                  )}
-                  <View style={styles.inputRow}>
-                    <TextInput
-                      style={styles.input}
-                      value={keys[def.key] ?? ""}
-                      onChangeText={(v) =>
-                        setKeys((prev) => ({ ...prev, [def.key]: v }))
-                      }
-                      placeholder={
-                        saved
-                          ? "Saved — enter a new key to replace"
-                          : "Enter your key"
-                      }
-                      placeholderTextColor={Colors.textMuted}
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      secureTextEntry={!visibleKeys[def.key]}
-                    />
-                    <Pressable
-                      style={styles.eyeBtn}
-                      onPress={() =>
-                        setVisibleKeys((prev) => ({
-                          ...prev,
-                          [def.key]: !prev[def.key],
-                        }))
-                      }
-                      hitSlop={8}
-                    >
-                      {visibleKeys[def.key] ? (
-                        <EyeOff size={18} color={Colors.textSecondary} />
-                      ) : (
-                        <Eye size={18} color={Colors.textSecondary} />
-                      )}
-                    </Pressable>
-                  </View>
-                  <Pressable
-                    onPress={() => handleOpenLink(def.linkUrl)}
-                    style={styles.helperLink}
-                  >
-                    <Text style={styles.helperLinkText}>Get your key ↗</Text>
-                  </Pressable>
-                  <Text style={styles.helperText}>{def.helper}</Text>
-                </View>
-                );
-              })}
-            </View>
-
-            {/* ═══ Card 2: Default Email ═══ */}
+            {/* ═══ Card 1: Default Email ═══ */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Mail size={18} color={Colors.accent} />
@@ -526,7 +227,7 @@ export default function SettingsScreen() {
               />
             </View>
 
-            {/* ═══ Card 3: Video Playback ═══ */}
+            {/* ═══ Card 2: Video Playback ═══ */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Monitor size={18} color={Colors.accent} />
@@ -603,7 +304,7 @@ export default function SettingsScreen() {
               </View>
             </View>
 
-            {/* ═══ Card 4: About background playback (accordion) ═══ */}
+            {/* ═══ Card 3: About background playback (accordion) ═══ */}
             <Pressable style={styles.card} onPress={toggleAccordion}>
               <View style={styles.accordionHeader}>
                 <Text style={styles.accordionTitle}>About background playback</Text>
@@ -626,7 +327,7 @@ export default function SettingsScreen() {
               </Animated.View>
             </Pressable>
 
-            {/* ═══ Card 5: Danger Zone ═══ */}
+            {/* ═══ Card 4: Danger Zone ═══ */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <Trash2 size={18} color={Colors.destructive} />
@@ -696,7 +397,7 @@ export default function SettingsScreen() {
               </Pressable>
             </View>
 
-            {/* ═══ Card 6: Support ═══ */}
+            {/* ═══ Card 5: Support ═══ */}
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <CircleHelp size={18} color={Colors.accent} />
@@ -886,46 +587,11 @@ const styles = StyleSheet.create({
   },
 
   // Fields
-  fieldGroup: { marginBottom: 16 },
-  fieldLabelRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
   fieldLabel: {
     fontSize: 13,
     fontWeight: "600" as const,
     color: Colors.textSecondary,
     marginBottom: 7,
-  },
-  keySavedBadge: {
-    backgroundColor: "hsla(142, 71%, 45%, 0.18)",
-    borderRadius: 5,
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-  },
-  keySavedBadgeText: {
-    fontSize: 10,
-    fontWeight: "700" as const,
-    color: Colors.success,
-  },
-  keyDeleteBtn: {
-    width: 26,
-    height: 26,
-    borderRadius: 5,
-    backgroundColor: "hsla(0, 72%, 51%, 0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  keyDeleteBtnPressed: {
-    opacity: 0.7,
-    backgroundColor: "hsla(0, 72%, 51%, 0.22)",
-  },
-  keyMaskedText: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginBottom: 8,
-    fontFamily: Platform.OS === "ios" ? "Menlo" : "monospace",
   },
   input: {
     backgroundColor: Colors.input,
@@ -936,25 +602,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontSize: 15,
     color: Colors.textPrimary,
-  },
-  inputRow: {
-    position: "relative",
-  },
-  eyeBtn: {
-    position: "absolute",
-    right: 12,
-    top: 0,
-    bottom: 0,
-    justifyContent: "center",
-  },
-  helperLink: {
-    marginTop: 6,
-    marginBottom: 2,
-  },
-  helperLinkText: {
-    fontSize: 12,
-    fontWeight: "600" as const,
-    color: Colors.accent,
   },
   helperText: {
     fontSize: 11,
@@ -1066,64 +713,6 @@ const styles = StyleSheet.create({
   disabled: { opacity: 0.7 },
 
   // Sign out
-  // YouTube connection
-  youtubeBadge: {
-    width: 28,
-    height: 28,
-    borderRadius: 6,
-    backgroundColor: "hsl(0, 72%, 51%)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  youtubeBadgeText: {
-    fontSize: 12,
-    fontWeight: "800" as const,
-    color: Colors.white,
-  },
-  youtubeConnectBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 44,
-    borderRadius: 10,
-    backgroundColor: Colors.success,
-    marginBottom: 10,
-  },
-  youtubeConnectText: {
-    color: Colors.white,
-    fontSize: 15,
-    fontWeight: "700" as const,
-  },
-  youtubeConnectPressed: {
-    opacity: 0.9,
-    backgroundColor: "hsl(142, 71%, 35%)",
-  },
-  youtubeDisconnectBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    height: 44,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: Colors.destructive,
-    marginTop: 4,
-  },
-  youtubeDisconnectText: {
-    color: Colors.destructive,
-    fontSize: 15,
-    fontWeight: "700" as const,
-  },
-  connectedName: {
-    color: Colors.accent,
-    fontWeight: "600" as const,
-  },
-  errorText: {
-    fontSize: 12,
-    color: Colors.destructive,
-    marginBottom: 10,
-  },
 
   // Support card
   supportRow: {
