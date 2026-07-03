@@ -1793,6 +1793,10 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 10,
     borderBottomWidth: 1,
     borderBottomColor: "#565656",
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderLeftColor: "#565656",
+    borderRightColor: "#565656",
   },
   transportRow: {
     flexDirection: "row",
