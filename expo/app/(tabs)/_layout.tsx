@@ -79,12 +79,13 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.card,
     borderTopColor: Colors.border,
     borderTopWidth: StyleSheet.hairlineWidth,
-    paddingBottom: 4,
+    paddingBottom: 6,
     paddingTop: 4,
-    height: 56,
+    height: 64,
   },
   tabLabel: {
     fontSize: 11,
     fontWeight: "600" as const,
+    marginBottom: 2,
   },
 });
