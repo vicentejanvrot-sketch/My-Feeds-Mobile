@@ -1683,6 +1683,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 16,
     paddingBottom: 12,
+    borderTopLeftRadius: 10,
+    borderTopRightRadius: 10,
+    borderTopWidth: 1,
+    borderTopColor: "#565656",
   },
   headerTitle: {
     fontSize: 17,
