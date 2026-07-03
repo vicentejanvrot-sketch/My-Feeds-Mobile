@@ -1785,6 +1785,10 @@ const styles = StyleSheet.create({
     width: "100%",
     backgroundColor: Colors.black,
     paddingBottom: 12,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: "#565656",
   },
   transportRow: {
     flexDirection: "row",
