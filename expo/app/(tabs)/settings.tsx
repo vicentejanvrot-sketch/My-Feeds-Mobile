@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   ActivityIndicator,
   Alert,
@@ -64,7 +65,14 @@ export default function SettingsScreen() {
 
   // ── Form state ────────────────────────────────────────────────
 
+  const scrollRef = useRef<ScrollView>(null);
   const [defaultEmail, setDefaultEmail] = useState("");
+
+  useFocusEffect(
+    useCallback(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, []),
+  );
 
   const deleteAccount = useDeleteAccount();
 
@@ -180,6 +188,7 @@ export default function SettingsScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[styles.content, isWide && styles.contentWide, { paddingTop: insets.top + 16 }]}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}

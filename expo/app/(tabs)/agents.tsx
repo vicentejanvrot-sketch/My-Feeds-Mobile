@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useRef } from "react";
 import {
   ActivityIndicator,
   Pressable,
@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -36,7 +36,14 @@ export default function AgentsScreen() {
   const queryClient = useQueryClient();
   useRealtimeInvalidation("agents", qk.agents, !overlay.state.status);
 
+  const scrollRef = useRef<ScrollView>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, []),
+  );
 
   const listUnsorted = agents.data ?? [];
   const list = useMemo(
@@ -142,6 +149,7 @@ export default function AgentsScreen() {
 
   return (
     <ScrollView
+      ref={scrollRef}
       style={styles.root}
       contentContainerStyle={[styles.content, isWide && styles.contentWide, { paddingTop: insets.top + 16 }]}
       showsVerticalScrollIndicator={false}

@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { useMemo, useState, useCallback, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIndicator,
@@ -11,7 +11,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -74,7 +74,14 @@ export default function DashboardScreen() {
 
   useDashboardRealtime(!overlay.state.status);
 
+  const scrollRef = useRef<ScrollView>(null);
   const [pendingId, setPendingId] = useState<string | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, []),
+  );
 
   const refreshing =
     agents.isRefetching || runs.isRefetching || items.isRefetching || channels.isRefetching;
@@ -265,6 +272,7 @@ export default function DashboardScreen() {
   return (
     <View style={styles.root}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[
           styles.content,
           isWide && styles.contentWide,

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -10,7 +10,7 @@ import {
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import * as Haptics from "expo-haptics";
 import {
   Ban,
@@ -86,6 +86,13 @@ export default function HistoryScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const toast = useToast();
+  const listRef = useRef<FlatList>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, []),
+  );
 
   const handleDeleteAll = () => {
     Alert.alert(
@@ -184,6 +191,7 @@ export default function HistoryScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={runData}
           keyExtractor={(r) => r.id}
           contentContainerStyle={[

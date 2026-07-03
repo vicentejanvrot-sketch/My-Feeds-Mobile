@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   FlatList,
@@ -12,7 +12,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Image } from "expo-image";
 import * as Haptics from "expo-haptics";
@@ -112,7 +112,14 @@ export default function FeedScreen() {
   const { width: windowWidth } = useWindowDimensions();
   const isWide = windowWidth >= IPAD_BREAKPOINT;
   const showToast = useToast();
+  const listRef = useRef<FlatList>(null);
   const params = useLocalSearchParams<{ agentId?: string; status?: string }>();
+
+  useFocusEffect(
+    useCallback(() => {
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+    }, []),
+  );
 
   // Data
   const items = useFeedItems(500);
@@ -365,6 +372,7 @@ export default function FeedScreen() {
         </View>
       ) : (
         <FlatList
+          ref={listRef}
           data={filtered}
           keyExtractor={(it) => it.id}
           contentContainerStyle={styles.listContent}

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -13,7 +13,7 @@ import {
   useWindowDimensions,
   View,
 } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter, useFocusEffect } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Haptics from "expo-haptics";
 import { Image } from "expo-image";
@@ -524,6 +524,13 @@ export default function AgentDetailScreen() {
   const isWide = windowWidth >= IPAD_BREAKPOINT;
   const router = useRouter();
   const { agentId } = useLocalSearchParams<{ agentId: string }>();
+  const scrollRef = useRef<ScrollView>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, []),
+  );
 
   const showToast = useToast();
   const overlay = useRunningOverlay();
@@ -790,6 +797,7 @@ export default function AgentDetailScreen() {
   return (
     <>
       <ScrollView
+        ref={scrollRef}
         style={styles.root}
         contentContainerStyle={[styles.content, isWide && styles.contentWide, { paddingTop: insets.top + 8 }]}
         showsVerticalScrollIndicator={false}
