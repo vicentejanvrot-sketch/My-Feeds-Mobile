@@ -108,7 +108,7 @@ export default function AgentFormScreen() {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [runTime, setRunTime] = useState("07:00");
-  const [timezone, setTimezone] = useState("America/Edmonton");
+  const [timezone, setTimezone] = useState("America/New_York");
   const [lookbackHours, setLookbackHours] = useState("36");
   const [includeShorts, setIncludeShorts] = useState(false);
   const [includeLive, setIncludeLive] = useState(false);
@@ -168,7 +168,7 @@ export default function AgentFormScreen() {
     setName(agent.name ?? "");
     setDescription(agent.description ?? "");
     setRunTime(agent.run_time_local ?? "07:00");
-    setTimezone(agent.timezone ?? "America/Edmonton");
+    setTimezone(agent.timezone ?? "America/New_York");
     setLookbackHours(String(agent.lookback_hours ?? 36));
     setIncludeShorts(agent.include_shorts ?? false);
     setIncludeLive(agent.include_live ?? false);
