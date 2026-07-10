@@ -30,7 +30,6 @@ import {
   Mail,
   Clock,
   Globe,
-  Cpu,
   Star,
   ImageOff,
   Check,
@@ -40,7 +39,7 @@ import {
 } from "lucide-react-native";
 import { useQueryClient } from "@tanstack/react-query";
 import { Colors } from "@/constants/colors";
-import { agentAccent, AI_PROVIDERS } from "@/lib/database";
+import { agentAccent } from "@/lib/database";
 import {
   useAgent,
   useChannels,
@@ -88,11 +87,6 @@ const PRIORITY_OPTIONS = [
   { value: 2, label: "2 - Low" },
   { value: 1, label: "1 - Lowest" },
 ] as const;
-
-function providerLabel(provider: string | null): string {
-  const found = AI_PROVIDERS.find((p) => p.value === provider);
-  return found?.label ?? provider ?? "None";
-}
 
 // ── Priority picker for add-channel dialog ─────────────────────────
 
@@ -876,12 +870,6 @@ export default function AgentDetailScreen() {
               ? `${agent.schedule_frequency ?? "Manual"}${agent.lookback_hours != null ? ` • ${agent.lookback_hours}h lookback` : ""}`
               : undefined
           }
-        />
-
-        <InfoCard
-          icon={<Cpu size={20} color={accent} />}
-          title={providerLabel(agent.ai_provider)}
-          subtitle="For video summaries"
         />
 
         <View style={icStyles.card}>
