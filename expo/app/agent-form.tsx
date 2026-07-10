@@ -120,7 +120,6 @@ export default function AgentFormScreen() {
   const [keywords, setKeywords] = useState<string[]>([]);
   const [recipients, setRecipients] = useState<string[]>([]);
 
-  const [keywordInput, setKeywordInput] = useState("");
   const [recipientInput, setRecipientInput] = useState("");
   const [saving, setSaving] = useState(false);
 
@@ -208,11 +207,6 @@ export default function AgentFormScreen() {
       showToast("Description must be 500 characters or fewer", "error");
       return;
     }
-    if (keywords.length > 20) {
-      showToast("Maximum 20 keywords", "error");
-      return;
-    }
-
     setSaving(true);
     Keyboard.dismiss();
 
@@ -298,30 +292,6 @@ export default function AgentFormScreen() {
     durationWeight, keywordWeight, keywords, recipients, isEdit, agentId,
     createAgent, updateAgent, deleteRecipient, showToast, router,
   ]);
-
-  // ── keyword helpers ──────────────────────────────────────────────
-  const addKeyword = useCallback(() => {
-    const kw = keywordInput.trim();
-    if (!kw) return;
-    if (kw.length > 50) {
-      showToast("Keyword must be 50 characters or fewer", "error");
-      return;
-    }
-    if (keywords.length >= 20) {
-      showToast("Maximum 20 keywords", "error");
-      return;
-    }
-    if (keywords.includes(kw)) {
-      showToast("Keyword already added", "error");
-      return;
-    }
-    setKeywords((prev) => [...prev, kw]);
-    setKeywordInput("");
-  }, [keywordInput, keywords, showToast]);
-
-  const removeKeyword = useCallback((kw: string) => {
-    setKeywords((prev) => prev.filter((k) => k !== kw));
-  }, []);
 
   // ── recipient helpers ────────────────────────────────────────────
   const addRecipientEmail = useCallback(() => {
@@ -529,44 +499,6 @@ export default function AgentFormScreen() {
             onValueChange={setDurationWeight}
             helper="Boosts videos 8–25 minutes"
           />
-          <SliderField
-            label="Keyword Relevance"
-            value={keywordWeight}
-            onValueChange={setKeywordWeight}
-          />
-        </FormSection>
-
-        {/* ── Keywords ─────────────────────────────────────────────── */}
-        <FormSection title="Keywords">
-          <View style={styles.chipInputRow}>
-            <TextInput
-              style={[styles.input, styles.flex1]}
-              placeholder="Add a keyword…"
-              placeholderTextColor={Colors.textMuted}
-              value={keywordInput}
-              onChangeText={setKeywordInput}
-              maxLength={50}
-              returnKeyType="done"
-              onSubmitEditing={addKeyword}
-            />
-            <Pressable
-              style={({ pressed }) => [
-                styles.addBtn,
-                { backgroundColor: Colors.accent },
-                pressed && styles.btnPressed,
-              ]}
-              onPress={addKeyword}
-            >
-              <Plus size={18} color={Colors.white} />
-            </Pressable>
-          </View>
-          {keywords.length > 0 ? (
-            <View style={styles.chipContainer}>
-              {keywords.map((kw) => (
-                <Chip key={kw} label={kw} onRemove={() => removeKeyword(kw)} />
-              ))}
-            </View>
-          ) : null}
         </FormSection>
 
         {/* ── Email Recipients ─────────────────────────────────────── */}
