@@ -60,7 +60,7 @@ const SPEED_KEY = "@settings/video_speed";
  * gear menu both read/write the same values.
  */
 export function useVideoQuality() {
-  const [quality, setQualityState] = useState<QualityKey>("Auto");
+  const [quality, setQualityState] = useState<QualityKey>("1080p");
   const [speed, setSpeedState] = useState<SpeedKey>("2");
   const [ready, setReady] = useState(false);
 
