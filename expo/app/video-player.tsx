@@ -32,7 +32,6 @@ import {
   Heart,
   Maximize,
   Minimize2,
-  Captions,
   MessageCircle,
   MoreHorizontal,
   Pause,
@@ -1282,10 +1281,14 @@ export default function VideoPlayerScreen() {
               ]}
               hitSlop={8}
             >
-              <Captions
-                size={18}
-                color={captionsOn ? Colors.accent : Colors.white}
-              />
+              <Text
+                style={[
+                  styles.ccLabel,
+                  { color: captionsOn ? Colors.accent : Colors.white },
+                ]}
+              >
+                CC
+              </Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -1455,10 +1458,14 @@ export default function VideoPlayerScreen() {
               ]}
               hitSlop={8}
             >
-              <Captions
-                size={18}
-                color={captionsOn ? Colors.accent : Colors.white}
-              />
+              <Text
+                style={[
+                  styles.ccLabel,
+                  { color: captionsOn ? Colors.accent : Colors.white },
+                ]}
+              >
+                CC
+              </Text>
             </Pressable>
           </View>
           {/* Speed pills */}
@@ -2226,6 +2233,11 @@ const styles = StyleSheet.create({
   },
   ccBtnActive: {
     backgroundColor: "rgba(255,255,255,0.22)",
+  },
+  ccLabel: {
+    fontSize: 13,
+    fontWeight: "800" as const,
+    letterSpacing: 0.5,
   },
   volumeSliderArea: {
     width: 80,
