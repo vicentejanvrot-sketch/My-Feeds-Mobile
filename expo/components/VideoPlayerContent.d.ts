@@ -20,6 +20,8 @@ export interface VideoPlayerHandle {
   unMute: () => Promise<void>;
   /** Toggle between play and pause regardless of tracked state. */
   togglePlayback: () => Promise<void>;
+  /** Turn YouTube captions module on or off. */
+  setCaptions: (on: boolean) => Promise<void>;
 }
 
 interface VideoPlayerContentProps {

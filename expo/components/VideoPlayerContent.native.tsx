@@ -28,6 +28,8 @@ export interface VideoPlayerHandle {
   mute: () => Promise<void>;
   /** Unmute audio. No-op on native. */
   unMute: () => Promise<void>;
+  /** Toggle YouTube captions module on or off. */
+  setCaptions: (on: boolean) => Promise<void>;
 }
 
 /**
@@ -239,6 +241,15 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
         injectPlayerJS('try{if(window.player&&player.unMute){player.unMute();}}catch(e){} true;');
       },
       togglePlayback,
+      setCaptions: async (on: boolean) => {
+        // Toggle YouTube's captions module via the IFrame API player object.
+        // loadModule('captions') shows CC; unloadModule('captions') hides them.
+        if (on) {
+          injectPlayerJS('try{if(window.player&&player.loadModule){player.loadModule("captions");player.setOption("captions","track",{});}}catch(e){} true;');
+        } else {
+          injectPlayerJS('try{if(window.player&&player.unloadModule){player.unloadModule("captions");}}catch(e){} true;');
+        }
+      },
     }), [play, pause, seekTo, togglePlayback, injectPlayerJS]);
 
     /** Intercept onChangeState to keep shouldPlay in sync with the real

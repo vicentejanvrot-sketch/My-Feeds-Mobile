@@ -25,6 +25,8 @@ export interface VideoPlayerHandle {
   mute: () => Promise<void>;
   /** Unmute audio. */
   unMute: () => Promise<void>;
+  /** Toggle YouTube captions module on or off. */
+  setCaptions: (on: boolean) => Promise<void>;
 }
 
 interface VideoPlayerContentProps {
@@ -134,6 +136,11 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       sendCommand("unMute");
     }, [sendCommand]);
 
+    const setCaptions = useCallback(async (on: boolean) => {
+      // YouTube IFrame API: toggle the captions ('cc') module on/off.
+      sendCommand(on ? "loadModule" : "unloadModule", "captions");
+    }, [sendCommand]);
+
     const togglePlayback = useCallback(async () => {
       // Use the internally tracked playing state (updated by infoDelivery
       // events) so the toggle is always correct regardless of parent sync.
@@ -236,7 +243,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       mute,
       unMute,
       togglePlayback,
-    }), [play, pause, seekTo, setVolume, mute, unMute, togglePlayback]);
+      setCaptions,
+    }), [play, pause, seekTo, setVolume, mute, unMute, togglePlayback, setCaptions]);
 
     // ── Cleanup poll interval on unmount ────────────────
     useEffect(() => {
