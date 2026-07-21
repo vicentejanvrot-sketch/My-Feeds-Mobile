@@ -26,7 +26,7 @@ struct MainTabView: View {
                 AgentsView()
                     .withAppRoutes()
             }
-            .tabItem { Label("Agents", systemImage: "cpu") }
+            .tabItem { Label("Agents", systemImage: "robot") }
             .tag(AppTab.agents)
 
             NavigationStack {
