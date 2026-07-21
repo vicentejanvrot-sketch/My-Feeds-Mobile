@@ -1,10 +1,15 @@
 {
+  "$schema": "https://rork.com/schema/rork.json",
   "apps": [
     {
       "name": "My Feeds",
       "path": "expo",
       "framework": "react-native"
+    },
+    {
+      "name": "My Feeds",
+      "path": "ios",
+      "framework": "swift"
     }
-  ],
-  "$schema": "https://rork.com/schema/rork.json"
+  ]
 }
