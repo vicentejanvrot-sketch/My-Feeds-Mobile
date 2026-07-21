@@ -489,8 +489,8 @@ struct VideoPlayerScreen: View {
             }
             .accessibilityLabel(isMuted ? "Turn sound on" : "Mute")
 
-            Slider(value: volumeBinding, in: 0...100, step: 1)
-                .tint(Theme.accent)
+            SystemVolumeSlider(value: volumeBinding)
+                .frame(height: 36)
                 .accessibilityLabel("Video volume")
                 .accessibilityValue("\(Int(volume.rounded())) percent")
         }
