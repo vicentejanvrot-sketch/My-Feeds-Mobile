@@ -18,6 +18,7 @@ struct VideoPlayerScreen: View {
     @State private var showWatchedOverlay = false
     @State private var markedWatchedOnce = false
     @State private var isMuted = false
+    @State private var volume: Double = 100
     @State private var isScrubbing = false
     @State private var scrubTime: Double = 0
     @State private var showLoadError = false
@@ -66,6 +67,7 @@ struct VideoPlayerScreen: View {
         VStack(spacing: 0) {
             header
             speedPillsRow
+                .frame(maxWidth: .infinity)
                 .padding(.top, 8)
             if controller.duration > 0 {
                 countdownRow
@@ -94,26 +96,12 @@ struct VideoPlayerScreen: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            playerView
-                .aspectRatio(16 / 9, contentMode: .fit)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            VStack(spacing: 0) {
+                playerView
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            VStack {
-                Spacer()
-                VStack(spacing: 10) {
-                    progressRow(fullscreen: true)
-                    transportRow(iconScale: 1.1)
-                    volumeRow
-                    speedPillsRow
-                }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 24)
-                .background(
-                    LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
-                        .frame(height: 220)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                        .allowsHitTesting(false)
-                )
+                landscapeControlsPanel
             }
 
             VStack {
@@ -201,7 +189,6 @@ struct VideoPlayerScreen: View {
                 .buttonStyle(.plain)
             }
         }
-        .frame(maxWidth: .infinity)
     }
 
     private var countdownRow: some View {
@@ -317,7 +304,8 @@ struct VideoPlayerScreen: View {
         VStack(spacing: 4) {
             progressRow(fullscreen: false)
             transportRow(iconScale: 1)
-            volumeRow
+            volumeControl
+                .frame(maxWidth: 260)
                 .padding(.bottom, 10)
         }
         .background(Color.black)
@@ -326,6 +314,30 @@ struct VideoPlayerScreen: View {
             UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10)
                 .stroke(Color(red: 0x56 / 255, green: 0x56 / 255, blue: 0x56 / 255), lineWidth: 1)
         )
+    }
+
+    private var landscapeControlsPanel: some View {
+        VStack(spacing: 2) {
+            progressRow(fullscreen: true)
+
+            HStack(alignment: .center, spacing: 14) {
+                transportButtons(iconScale: 0.9)
+                volumeControl
+                    .frame(width: 150)
+
+                Spacer(minLength: 12)
+
+                speedPillsRow
+            }
+            .padding(.horizontal, 20)
+            .padding(.bottom, 12)
+        }
+        .background(Color.black)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(.white.opacity(0.12))
+                .frame(height: 1)
+        }
     }
 
     private func progressRow(fullscreen: Bool) -> some View {
@@ -400,6 +412,12 @@ struct VideoPlayerScreen: View {
     }
 
     private func transportRow(iconScale: CGFloat) -> some View {
+        transportButtons(iconScale: iconScale)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 6)
+    }
+
+    private func transportButtons(iconScale: CGFloat) -> some View {
         HStack(spacing: 24) {
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -412,6 +430,7 @@ struct VideoPlayerScreen: View {
                     .background(.white.opacity(0.15))
                     .clipShape(Circle())
             }
+            .accessibilityLabel("Go back 10 seconds")
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -424,6 +443,7 @@ struct VideoPlayerScreen: View {
                     .background(.white.opacity(0.22))
                     .clipShape(Circle())
             }
+            .accessibilityLabel(controller.isPlaying ? "Pause" : "Play")
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
@@ -436,27 +456,63 @@ struct VideoPlayerScreen: View {
                     .background(.white.opacity(0.15))
                     .clipShape(Circle())
             }
+            .accessibilityLabel("Go forward 10 seconds")
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 6)
     }
 
-    private var volumeRow: some View {
-        HStack(spacing: 10) {
+    private var volumeControl: some View {
+        HStack(spacing: 8) {
             Button {
-                isMuted.toggle()
-                if isMuted { controller.mute() } else { controller.unmute() }
+                toggleMute()
             } label: {
-                Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                Image(systemName: volumeIcon)
                     .font(.system(size: 15))
                     .foregroundStyle(.white)
                     .frame(width: 36, height: 36)
                     .background(.white.opacity(0.12))
                     .clipShape(Circle())
             }
+            .accessibilityLabel(isMuted ? "Turn sound on" : "Mute")
 
+            Slider(value: volumeBinding, in: 0...100, step: 1)
+                .tint(Theme.accent)
+                .accessibilityLabel("Video volume")
+                .accessibilityValue("\(Int(volume.rounded())) percent")
         }
-        .frame(maxWidth: .infinity)
+    }
+
+    private var volumeBinding: Binding<Double> {
+        Binding(
+            get: { volume },
+            set: { newValue in
+                volume = newValue
+                controller.setVolume(Int(newValue.rounded()))
+                if newValue <= 0 {
+                    isMuted = true
+                    controller.mute()
+                } else if isMuted {
+                    isMuted = false
+                    controller.unmute()
+                }
+            }
+        )
+    }
+
+    private var volumeIcon: String {
+        if isMuted || volume <= 0 { return "speaker.slash.fill" }
+        if volume < 40 { return "speaker.wave.1.fill" }
+        return "speaker.wave.2.fill"
+    }
+
+    private func toggleMute() {
+        isMuted.toggle()
+        if isMuted {
+            controller.mute()
+        } else {
+            if volume <= 0 { volume = 50 }
+            controller.setVolume(Int(volume.rounded()))
+            controller.unmute()
+        }
     }
 
     // MARK: - Overlays & sheets
