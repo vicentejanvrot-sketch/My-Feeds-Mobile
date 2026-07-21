@@ -64,9 +64,18 @@ final class SupabaseService {
     }
 
     func fetchFeedItems(limit: Int = 500) async throws -> [FeedItem] {
-        try await db.from("items").select("*, item_analysis(*)")
-            .order("published_at", ascending: false, nullsFirst: false)
-            .limit(limit).execute().value
+        do {
+            return try await db.from("items").select("*, item_analysis(*)")
+                .order("published_at", ascending: false, nullsFirst: false)
+                .limit(limit).execute().value
+        } catch {
+            // A single malformed/legacy analysis row must not prevent the
+            // native app from showing its videos. Retry with the base item
+            // fields; FeedItem's optional analysis then falls back gracefully.
+            return try await db.from("items").select()
+                .order("published_at", ascending: false, nullsFirst: false)
+                .limit(limit).execute().value
+        }
     }
 
     func fetchRunItemStatuses(runIds: [String]) async throws -> [RunItemStatus] {

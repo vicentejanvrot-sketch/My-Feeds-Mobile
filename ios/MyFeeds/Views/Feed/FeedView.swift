@@ -14,7 +14,9 @@ struct FeedView: View {
     @State private var search = ""
     @State private var agentFilter: String? = nil
     @State private var channelFilter: String? = nil
-    @State private var statusFilter: ItemStatus? = ItemStatus.notWatched
+    // Show every video on first load. Users can narrow this to Not Watched
+    // (or another status) from the status filter.
+    @State private var statusFilter: ItemStatus? = nil
     @State private var sortMode: SortMode = .recent
 
     // Selection
@@ -355,7 +357,7 @@ struct FeedView: View {
     }
 
     private var emptyState: some View {
-        let hasFilters = !search.isEmpty || agentFilter != nil || statusFilter != .notWatched
+        let hasFilters = !search.isEmpty || agentFilter != nil || channelFilter != nil || statusFilter != nil
         return VStack(spacing: 6) {
             Text(hasFilters ? "No videos match your filters" : "No videos yet")
                 .font(.system(size: 16, weight: .bold))
@@ -471,18 +473,27 @@ struct FeedView: View {
 
     private func load() async {
         let service = SupabaseService.shared
+        isLoading = items.isEmpty
+
+        // Feed items are the primary content on this screen. Load them
+        // independently so a failure in optional agent/channel metadata never
+        // leaves the iOS feed blank.
         do {
-            async let itemsTask = service.fetchFeedItems(limit: 500)
-            async let agentsTask = service.fetchAgents()
-            async let channelsTask = service.fetchAllChannels()
-            let (loadedItems, loadedAgents, loadedChannels) = try await (itemsTask, agentsTask, channelsTask)
-            items = loadedItems
-            agents = loadedAgents
-            channels = loadedChannels
+            items = try await service.fetchFeedItems(limit: 500)
             isOffline = false
         } catch {
             isOffline = true
+            toasts.show("Couldn't load videos: \(error.localizedDescription)", type: .error)
         }
+
+        // These values only enhance filter labels and channel choices. Keep
+        // rendering videos even if either request fails or contains bad data.
+        async let loadedAgents = try? service.fetchAgents()
+        async let loadedChannels = try? service.fetchAllChannels()
+        let (agentResult, channelResult) = await (loadedAgents, loadedChannels)
+        if let agentResult { agents = agentResult }
+        if let channelResult { channels = channelResult }
+
         isLoading = false
     }
 
