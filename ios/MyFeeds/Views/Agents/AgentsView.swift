@@ -5,6 +5,7 @@ struct AgentsView: View {
 
     @State private var agents: [Agent] = []
     @State private var isLoading = true
+    @State private var isOffline = false
 
     private var sortedAgents: [Agent] {
         agents.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -14,6 +15,8 @@ struct AgentsView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
+
+                if isOffline { offlineBanner }
 
                 if isLoading {
                     ProgressView()
@@ -98,11 +101,47 @@ struct AgentsView: View {
         .padding(.bottom, 20)
     }
 
+    private var offlineBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 13))
+            Text("Offline — showing last synced agents.")
+                .font(.system(size: 13, weight: .medium))
+            Spacer()
+            Button {
+                Task { await load() }
+            } label: {
+                Text("Retry")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.accent)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(hsl: 38, 92, 50, alpha: 0.16))
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color(hsl: 38, 92, 50, alpha: 0.3)).frame(height: 0.5)
+        }
+        .padding(.bottom, 12)
+    }
+
     private func load() async {
+        let cache = CacheStore.shared
+        let cachedAgents = cache.cachedAgents()
+        if !cachedAgents.isEmpty {
+            agents = cachedAgents
+            isLoading = false
+        }
         do {
-            agents = try await SupabaseService.shared.fetchAgents()
+            let loaded = try await SupabaseService.shared.fetchAgents()
+            agents = loaded
+            isOffline = false
+            cache.replaceAll(agents: loaded)
         } catch {
-            // keep whatever we had
+            if cachedAgents.isEmpty {
+                agents = cachedAgents
+            }
+            isOffline = true
         }
         isLoading = false
     }

@@ -8,6 +8,7 @@ struct FeedView: View {
     @State private var agents: [Agent] = []
     @State private var channels: [Channel] = []
     @State private var isLoading = true
+    @State private var isOffline = false
 
     // Filters
     @State private var search = ""
@@ -88,6 +89,7 @@ struct FeedView: View {
         ZStack {
             VStack(spacing: 0) {
                 header
+                if isOffline { offlineBanner }
                 if isSelecting { bulkBar }
                 searchBar
                 filterStack
@@ -116,6 +118,29 @@ struct FeedView: View {
                 if let status = request.status { statusFilter = status }
                 router.feedRequest = nil
             }
+        }
+    }
+
+    private var offlineBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 13))
+            Text("Offline — showing last synced feed data.")
+                .font(.system(size: 13, weight: .medium))
+            Spacer()
+            Button {
+                Task { await load() }
+            } label: {
+                Text("Retry")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.accent)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(hsl: 38, 92, 50, alpha: 0.16))
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color(hsl: 38, 92, 50, alpha: 0.3)).frame(height: 0.5)
         }
     }
 
@@ -445,6 +470,19 @@ struct FeedView: View {
     // MARK: - Data & mutations
 
     private func load() async {
+        // Show cached data immediately so the UI is never blank.
+        let cache = CacheStore.shared
+        let cachedItems = cache.cachedFeedItems(limit: 500)
+        let cachedAgents = cache.cachedAgents()
+        let cachedChannels = cache.cachedAllChannels()
+        let hasCache = !cachedItems.isEmpty || !cachedAgents.isEmpty
+        if hasCache {
+            items = cachedItems
+            agents = cachedAgents
+            channels = cachedChannels
+            isLoading = false
+        }
+
         let service = SupabaseService.shared
         do {
             async let itemsTask = service.fetchFeedItems(limit: 500)
@@ -454,8 +492,21 @@ struct FeedView: View {
             items = loadedItems
             agents = loadedAgents
             channels = loadedChannels
+            isOffline = false
+            // Persist the fresh snapshot for offline use.
+            cache.replaceAll(
+                agents: loadedAgents,
+                channels: loadedChannels,
+                feedItems: loadedItems
+            )
         } catch {
-            // keep existing data
+            // Network failure — fall back to cache if we have it, else show empty.
+            if !hasCache {
+                items = cachedItems
+                agents = cachedAgents
+                channels = cachedChannels
+            }
+            isOffline = true
         }
         isLoading = false
     }
@@ -475,6 +526,8 @@ struct FeedView: View {
         if let index = items.firstIndex(where: { $0.id == item.id }) {
             items[index].userStatus = status
         }
+        // Mirror the change to the local cache so it survives a refresh.
+        CacheStore.shared.updateFeedItemStatus(id: item.id, status: status)
         Task {
             do {
                 try await SupabaseService.shared.updateItemStatus(id: item.id, status: status)
@@ -482,6 +535,7 @@ struct FeedView: View {
                 if let index = items.firstIndex(where: { $0.id == item.id }) {
                     items[index].userStatus = previous
                 }
+                CacheStore.shared.updateFeedItemStatus(id: item.id, status: previous ?? .notWatched)
                 toasts.show("Couldn't update status", type: .error)
             }
         }
@@ -496,6 +550,8 @@ struct FeedView: View {
         for index in items.indices where selectedIds.contains(items[index].id) {
             items[index].userStatus = status
         }
+        // Mirror to local cache.
+        CacheStore.shared.bulkUpdateFeedItemStatus(ids: ids, status: status)
         Task {
             do {
                 try await SupabaseService.shared.bulkUpdateItemStatus(ids: ids, status: status)
@@ -504,6 +560,7 @@ struct FeedView: View {
                 selectedIds.removeAll()
             } catch {
                 items = snapshot
+                CacheStore.shared.bulkUpdateFeedItemStatus(ids: ids, status: .notWatched)
                 toasts.show("Couldn't update selected videos", type: .error)
             }
             isBulkUpdating = false

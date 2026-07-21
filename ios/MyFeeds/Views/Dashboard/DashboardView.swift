@@ -10,6 +10,7 @@ struct DashboardView: View {
     @State private var channels: [Channel] = []
     @State private var counts: [String: AgentItemCounts] = [:]
     @State private var isLoading = true
+    @State private var isOffline = false
     @State private var agentToDelete: Agent?
 
     private var sortedAgents: [Agent] {
@@ -34,6 +35,7 @@ struct DashboardView: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 60)
                 } else {
+                    if isOffline { offlineBanner }
                     statGrid
 
                     SectionHeader(title: "My Feeds", actionLabel: agents.isEmpty ? nil : "View All") {
@@ -173,10 +175,46 @@ struct DashboardView: View {
             .cardStyle(radius: 10)
     }
 
+    private var offlineBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 13))
+            Text("Offline — showing last synced data.")
+                .font(.system(size: 13, weight: .medium))
+            Spacer()
+            Button {
+                Task { await load() }
+            } label: {
+                Text("Retry")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.accent)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(hsl: 38, 92, 50, alpha: 0.16))
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color(hsl: 38, 92, 50, alpha: 0.3)).frame(height: 0.5)
+        }
+        .padding(.bottom, 12)
+    }
+
     // MARK: - Data
 
     private func load() async {
         let service = SupabaseService.shared
+        let cache = CacheStore.shared
+        // Render cached data first for instant display.
+        let cachedAgents = cache.cachedAgents()
+        let cachedRuns = cache.cachedRuns(limit: 50)
+        let cachedChannels = cache.cachedAllChannels()
+        let hasCache = !cachedAgents.isEmpty || !cachedRuns.isEmpty
+        if hasCache {
+            agents = cachedAgents
+            runs = cachedRuns
+            channels = cachedChannels
+            isLoading = false
+        }
         do {
             async let agentsTask = service.fetchAgents()
             async let runsTask = service.fetchRuns(limit: 50)
@@ -186,8 +224,16 @@ struct DashboardView: View {
             runs = loadedRuns
             channels = loadedChannels
             isLoading = false
+            isOffline = false
             counts = (try? await service.fetchAgentItemCounts(agentIds: loadedAgents.map(\.id))) ?? [:]
+            cache.replaceAll(agents: loadedAgents, channels: loadedChannels, runs: loadedRuns)
         } catch {
+            if !hasCache {
+                agents = cachedAgents
+                runs = cachedRuns
+                channels = cachedChannels
+            }
+            isOffline = true
             isLoading = false
         }
     }

@@ -33,6 +33,7 @@ struct SettingsView: View {
                 } else {
                     defaultEmailCard
                     videoPlaybackCard
+                    biometricCard
                     aboutCard
                     dangerZoneCard
                     supportCard
@@ -111,7 +112,7 @@ struct SettingsView: View {
     private var videoPlaybackCard: some View {
         @Bindable var prefs = prefs
         return settingsCard(icon: "display", iconColor: Theme.accent, title: "Video Playback",
-                            description: "Configure default video playback settings.") {
+                            description: "Configure default video playback settings. These sync across your devices via iCloud.") {
             Text("Default Video Quality")
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundStyle(Theme.textSecondary)
@@ -174,7 +175,7 @@ struct SettingsView: View {
                 .padding(.top, 4)
             }
 
-            Text("Videos will start playing at this quality when available. This setting is saved locally.")
+            Text("Videos will start playing at this quality when available. This setting syncs across your devices via iCloud.")
                 .font(.system(size: 11))
                 .foregroundStyle(Theme.textMuted)
                 .padding(.top, 6)
@@ -194,6 +195,58 @@ struct SettingsView: View {
                     .tint(Theme.accent)
             }
             .padding(.top, 14)
+        }
+    }
+
+    private var biometricCard: some View {
+        @Bindable var prefs = prefs
+        let biometryName = BiometricAuthService.biometryName
+        let hasSavedCredentials = KeychainCredentialStore.savedCredentials() != nil
+        return settingsCard(
+            icon: biometryName == "Face ID" ? "faceid" : "touchid",
+            iconColor: Theme.accent,
+            title: "Quick Sign-In",
+            description: "Use \(biometryName ?? "biometrics") to unlock your saved login instead of typing your password."
+        ) {
+            if biometryName == nil {
+                HStack(spacing: 8) {
+                    Image(systemName: "exclamationmark.triangle")
+                        .font(.system(size: 13))
+                    Text("Biometrics aren't available or aren't set up on this device.")
+                        .font(.system(size: 13))
+                }
+                .foregroundStyle(Theme.textMuted)
+            } else {
+                HStack {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text("Enable \(biometryName ?? "biometrics") sign-in")
+                            .font(.system(size: 13, weight: .semibold))
+                            .foregroundStyle(Theme.textSecondary)
+                        Text(hasSavedCredentials
+                             ? "Sign out and back in with your password to update the saved login."
+                             : "Sign in once with your password, then use \(biometryName ?? "biometrics") next time.")
+                            .font(.system(size: 11))
+                            .foregroundStyle(Theme.textMuted)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $prefs.biometricEnabled)
+                        .labelsHidden()
+                        .tint(Theme.accent)
+                }
+                .padding(.top, 6)
+
+                if prefs.biometricEnabled && !hasSavedCredentials {
+                    Text("Save your login by signing out and signing back in with your password.")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundStyle(Theme.warning)
+                        .padding(.top, 8)
+                } else if prefs.biometricEnabled && hasSavedCredentials {
+                    Text("\(biometryName ?? "Biometrics") is ready. You'll see the option on the login screen.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Theme.success)
+                        .padding(.top, 8)
+                }
+            }
         }
     }
 

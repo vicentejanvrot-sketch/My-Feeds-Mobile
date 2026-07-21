@@ -58,6 +58,9 @@ final class AuthStore {
         userEmail = nil
         userId = nil
         status = .unauthenticated
+        // Wipe any saved biometric credentials on sign-out so a different user
+        // cannot reuse them on the same device.
+        KeychainCredentialStore.clear()
     }
 
     func sendPasswordReset(email: String) async -> String? {
@@ -80,4 +83,43 @@ final class AuthStore {
             return error.localizedDescription
         }
     }
+
+    // MARK: - Biometric helpers
+
+    /// Called after a successful manual sign-in. When the user has opted in to
+    /// biometric quick sign-in, persists the credentials to the Keychain so a
+    /// future Face ID / Touch ID unlock can replay them.
+    func persistCredentialsForBiometricLogin(email: String, password: String) {
+        guard VideoPrefs.shared.biometricEnabled else { return }
+        KeychainCredentialStore.save(email: email, password: password)
+    }
+
+    /// Returns the saved email (for pre-filling the login field), if any.
+    var biometricSavedEmail: String? { KeychainCredentialStore.savedEmail() }
+
+    /// Whether the device + the user have biometric quick sign-in ready to use.
+    var isBiometricLoginAvailable: Bool {
+        VideoPrefs.shared.biometricEnabled
+            && BiometricAuthService.isAvailable
+            && KeychainCredentialStore.savedCredentials() != nil
+    }
+
+    /// Runs Face ID / Touch ID, then replays the saved credentials into Supabase.
+    /// - Returns: An error string on failure, `nil` on success.
+    func signInWithBiometrics() async -> String? {
+        guard let (email, password) = KeychainCredentialStore.savedCredentials() else {
+            return "No saved credentials. Please sign in with your password first."
+        }
+        let ok = await BiometricAuthService.authenticate(
+            reason: "Unlock My Feeds with your saved login."
+        )
+        guard ok else { return "Biometric authentication was canceled." }
+        return await signIn(email: email, password: password)
+    }
+}
+
+/// Shared VideoPrefs singleton used by AuthStore for biometric opt-in checks.
+/// (The SwiftUI Environment instance is the same object injected at app launch.)
+extension VideoPrefs {
+    static let shared = VideoPrefs()
 }

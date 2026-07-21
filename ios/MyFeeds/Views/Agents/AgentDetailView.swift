@@ -14,6 +14,7 @@ struct AgentDetailView: View {
     @State private var runs: [Run] = []
     @State private var runItemCounts: [String: [ItemStatus: Int]] = [:]
     @State private var isLoading = true
+    @State private var isOffline = false
 
     @State private var channelStatusFilter: ItemStatus?
     @State private var filterAll = true
@@ -40,6 +41,7 @@ struct AgentDetailView: View {
         ZStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
+                    if isOffline { offlineBanner }
                     if isLoading {
                         ProgressView()
                             .controlSize(.large)
@@ -113,6 +115,30 @@ struct AgentDetailView: View {
         } message: {
             Text("Stop this run in progress?")
         }
+    }
+
+    private var offlineBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 13))
+            Text("Offline — showing last synced agent data.")
+                .font(.system(size: 13, weight: .medium))
+            Spacer()
+            Button {
+                Task { await load() }
+            } label: {
+                Text("Retry")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.accent)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(hsl: 38, 92, 50, alpha: 0.16))
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color(hsl: 38, 92, 50, alpha: 0.3)).frame(height: 0.5)
+        }
+        .padding(.bottom, 10)
     }
 
     // MARK: - Header card
@@ -846,6 +872,18 @@ struct AgentDetailView: View {
 
     private func load() async {
         let service = SupabaseService.shared
+        let cache = CacheStore.shared
+        // Render cached data first for instant display.
+        let cachedChannels = cache.cachedChannels(agentId: agentId)
+        let cachedRuns = cache.cachedAgentRuns(agentId: agentId, limit: 30)
+        let cachedAgents = cache.cachedAgents()
+        let cachedAgent = cachedAgents.first { $0.id == agentId }
+        if cachedAgent != nil || !cachedChannels.isEmpty {
+            agent = cachedAgent
+            channels = cachedChannels
+            runs = cachedRuns
+            isLoading = false
+        }
         do {
             async let agentTask = service.fetchAgent(id: agentId)
             async let channelsTask = service.fetchChannels(agentId: agentId)
@@ -858,6 +896,7 @@ struct AgentDetailView: View {
             recipients = loadedRecipients
             runs = loadedRuns
             isLoading = false
+            isOffline = false
 
             let statuses = try await service.fetchRunItemStatuses(runIds: loadedRuns.map(\.id))
             var grouped: [String: [ItemStatus: Int]] = [:]
@@ -867,7 +906,14 @@ struct AgentDetailView: View {
                 grouped[runId, default: [:]][status, default: 0] += 1
             }
             runItemCounts = grouped
+            // Persist the fresh snapshot for offline use.
+            cache.replaceAll(
+                agents: [loadedAgent],
+                channels: loadedChannels,
+                runs: loadedRuns
+            )
         } catch {
+            isOffline = true
             isLoading = false
         }
     }

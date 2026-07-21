@@ -8,6 +8,7 @@ struct HistoryView: View {
     @State private var agents: [String: Agent] = [:]
     @State private var channelsByAgent: [String: [Channel]] = [:]
     @State private var isLoading = true
+    @State private var isOffline = false
     @State private var expandedRuns: Set<String> = []
     @State private var cancellingRunId: String?
     @State private var isDeletingAll = false
@@ -17,6 +18,8 @@ struct HistoryView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
+
+                if isOffline { offlineBanner }
 
                 if isLoading && runs.isEmpty {
                     VStack(spacing: 12) {
@@ -129,8 +132,43 @@ struct HistoryView: View {
         .padding(.bottom, 16)
     }
 
+    private var offlineBanner: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.slash")
+                .font(.system(size: 13))
+            Text("Offline — showing last synced run history.")
+                .font(.system(size: 13, weight: .medium))
+            Spacer()
+            Button {
+                Task { await load() }
+            } label: {
+                Text("Retry")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(Theme.accent)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(Color(hsl: 38, 92, 50, alpha: 0.16))
+        .overlay(alignment: .bottom) {
+            Rectangle().fill(Color(hsl: 38, 92, 50, alpha: 0.3)).frame(height: 0.5)
+        }
+        .padding(.bottom, 12)
+    }
+
     private func load() async {
         let service = SupabaseService.shared
+        let cache = CacheStore.shared
+        let cachedRuns = cache.cachedRuns(limit: 100)
+        let cachedAgents = cache.cachedAgents()
+        let cachedChannels = cache.cachedAllChannels()
+        let hasCache = !cachedRuns.isEmpty || !cachedAgents.isEmpty
+        if hasCache {
+            runs = cachedRuns
+            agents = Dictionary(uniqueKeysWithValues: cachedAgents.map { ($0.id, $0) })
+            channelsByAgent = Dictionary(grouping: cachedChannels, by: \.agentId)
+            isLoading = false
+        }
         do {
             async let runsTask = service.fetchRuns(limit: 100)
             async let agentsTask = service.fetchAgents()
@@ -139,8 +177,15 @@ struct HistoryView: View {
             runs = loadedRuns
             agents = Dictionary(uniqueKeysWithValues: loadedAgents.map { ($0.id, $0) })
             channelsByAgent = Dictionary(grouping: loadedChannels, by: \.agentId)
+            isOffline = false
+            cache.replaceAll(agents: loadedAgents, channels: loadedChannels, runs: loadedRuns)
         } catch {
-            // keep existing data
+            if !hasCache {
+                runs = cachedRuns
+                agents = Dictionary(uniqueKeysWithValues: cachedAgents.map { ($0.id, $0) })
+                channelsByAgent = Dictionary(grouping: cachedChannels, by: \.agentId)
+            }
+            isOffline = true
         }
         isLoading = false
     }
