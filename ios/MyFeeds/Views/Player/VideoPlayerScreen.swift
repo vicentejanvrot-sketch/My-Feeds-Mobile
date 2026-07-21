@@ -88,11 +88,6 @@ struct VideoPlayerScreen: View {
 
             Spacer()
         }
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(Color(red: 0x56 / 255, green: 0x56 / 255, blue: 0x56 / 255), lineWidth: 1)
-                .ignoresSafeArea()
-        )
     }
 
     private var fullscreenLayout: some View {
@@ -329,10 +324,6 @@ struct VideoPlayerScreen: View {
         }
         .background(Color.black)
         .clipShape(UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10))
-        .overlay(
-            UnevenRoundedRectangle(bottomLeadingRadius: 10, bottomTrailingRadius: 10)
-                .stroke(Color(red: 0x56 / 255, green: 0x56 / 255, blue: 0x56 / 255), lineWidth: 1)
-        )
     }
 
     private var landscapeControlsPanel: some View {
