@@ -1,6 +1,6 @@
 import YoutubeIframe, { YoutubeIframeRef } from "react-native-youtube-iframe";
 import React, { useRef, useImperativeHandle, forwardRef, useCallback, useState } from "react";
-import { View, Platform } from "react-native";
+import { View } from "react-native";
 import type WebView from "react-native-webview";
 
 // ── Public ref API ─────────────────────────────────────────────────
@@ -105,13 +105,6 @@ const INJECTED_JS = `
       pendingMuted = undefined;
     }
   }, 200);
-
-  // Captions are intentionally not part of this app's player UI. YouTube can
-  // restore a viewer's saved caption preference, so keep the module unloaded.
-  setInterval(function() {
-    if (!window.player || typeof window.player.unloadModule !== 'function') return;
-    try { window.player.unloadModule('captions'); } catch(_) {}
-  }, 500);
 
   (function enforceFill(){
     var s=document.createElement('style');
@@ -292,8 +285,6 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
             mediaPlaybackRequiresUserAction: false,
             injectedJavaScript: INJECTED_JS,
             style: { width: boxWidth, height: boxHeight, backgroundColor: "transparent" },
-            userAgent:
-              "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
             allowsFullscreenVideo: true,
             domStorageEnabled: true,
             thirdPartyCookiesEnabled: true,
@@ -315,7 +306,10 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
             rel: 0,
             playsinline: 1,
             preventFullScreen: true,
-            origin: "https://www.youtube.com",
+            // YouTube's privacy-enhanced origin avoids the 152-4 player
+            // configuration error that its current mobile WebView checks can
+            // return for the regular youtube.com origin.
+            origin: "https://www.youtube-nocookie.com",
           }}
         />
       </View>
