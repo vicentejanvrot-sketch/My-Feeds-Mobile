@@ -606,6 +606,15 @@ struct VideoPlayerScreen: View {
         }
 
         controller.onReady = {
+            if let itemId = request.itemId, controller.duration > 0 {
+                let exactDuration = Int(controller.duration.rounded())
+                Task {
+                    try? await SupabaseService.shared.updateItemDuration(
+                        itemId: itemId,
+                        durationSeconds: exactDuration
+                    )
+                }
+            }
             // Apply persisted speed + quality, resume saved position
             if prefs.speed != .x1 {
                 controller.setRate(prefs.speed.value)

@@ -30,6 +30,9 @@ nonisolated struct FeedItem: Codable, Identifiable, Hashable, Sendable {
     var publishedAt: String?
     var userStatus: ItemStatus?
     var itemAnalysis: [ItemAnalysis]?
+    /// Real duration loaded separately when the embedded analysis join cannot
+    /// be decoded. This is runtime-only and is absent from normal API rows.
+    var resolvedDurationSeconds: Int?
 
     var analysis: ItemAnalysis? { itemAnalysis?.first }
     var status: ItemStatus { userStatus ?? .notWatched }
@@ -54,7 +57,7 @@ nonisolated struct FeedItem: Codable, Identifiable, Hashable, Sendable {
         return abs(hash)
     }
 
-    var displayDurationSeconds: Int { analysis?.durationSeconds ?? (180 + fallbackSeed % 7200) }
+    var displayDurationSeconds: Int? { analysis?.durationSeconds ?? resolvedDurationSeconds }
     var displayViews: Int { analysis?.viewsAtAnalysis ?? (1200 + fallbackSeed % 2_500_000) }
     var displayLikes: Int { analysis?.likesAtAnalysis ?? (40 + fallbackSeed % 180_000) }
     var displayComments: Int { analysis?.commentsAtAnalysis ?? (5 + fallbackSeed % 25_000) }

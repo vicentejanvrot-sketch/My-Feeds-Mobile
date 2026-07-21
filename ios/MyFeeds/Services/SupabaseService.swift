@@ -72,9 +72,14 @@ final class SupabaseService {
             // A single malformed/legacy analysis row must not prevent the
             // native app from showing its videos. Retry with the base item
             // fields; FeedItem's optional analysis then falls back gracefully.
-            return try await db.from("items").select()
+            var items: [FeedItem] = try await db.from("items").select()
                 .order("published_at", ascending: false, nullsFirst: false)
                 .limit(limit).execute().value
+            let durations = (try? await fetchDurations(itemIds: items.map(\.id))) ?? [:]
+            for index in items.indices {
+                items[index].resolvedDurationSeconds = durations[items[index].id]
+            }
+            return items
         }
     }
 
@@ -154,6 +159,16 @@ final class SupabaseService {
     func updateItemStatus(id: String, status: ItemStatus) async throws {
         try await db.from("items").update(["user_status": status.rawValue])
             .eq("id", value: id).execute()
+    }
+
+    /// Replace an analyzed duration with the authoritative value reported by
+    /// the YouTube IFrame player. No fabricated value is ever persisted.
+    func updateItemDuration(itemId: String, durationSeconds: Int) async throws {
+        guard durationSeconds > 0 else { return }
+        try await db.from("item_analysis")
+            .update(["duration_seconds": durationSeconds])
+            .eq("item_id", value: itemId)
+            .execute()
     }
 
     func bulkUpdateItemStatus(ids: [String], status: ItemStatus) async throws {

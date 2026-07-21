@@ -117,6 +117,11 @@ struct FeedView: View {
                 router.feedRequest = nil
             }
         }
+        .onChange(of: router.playerRequest == nil) { wasClosed, isClosed in
+            if !wasClosed && isClosed {
+                Task { await load() }
+            }
+        }
     }
 
     // MARK: - Header

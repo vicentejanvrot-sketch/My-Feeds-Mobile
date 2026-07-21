@@ -623,7 +623,7 @@ function seedFromId(id: string): number {
 function fallbackAnalysis(item: ItemWithAnalysis) {
   const s = seedFromId(item.id);
   return {
-    duration_seconds: 180 + (s % 7200),
+    duration_seconds: null as number | null,
     views_at_analysis: 1200 + (s % 2_500_000),
     likes_at_analysis: 40 + (s % 180_000),
     comments_at_analysis: 5 + (s % 25_000),
@@ -654,7 +654,7 @@ const FeedCard = React.memo(function FeedCard({
     const fallback = fallbackAnalysis(item);
     if (!realAnalysis) return fallback;
     return {
-      duration_seconds: realAnalysis.duration_seconds ?? fallback.duration_seconds,
+      duration_seconds: realAnalysis.duration_seconds,
       views_at_analysis: realAnalysis.views_at_analysis ?? fallback.views_at_analysis,
       likes_at_analysis: realAnalysis.likes_at_analysis ?? fallback.likes_at_analysis,
       comments_at_analysis: realAnalysis.comments_at_analysis ?? fallback.comments_at_analysis,
