@@ -121,7 +121,7 @@ struct AgentDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: "wifi.slash")
                 .font(.system(size: 13))
-            Text("Offline — showing last synced agent data.")
+            Text("Offline — couldn't load latest agent data.")
                 .font(.system(size: 13, weight: .medium))
             Spacer()
             Button {
@@ -872,18 +872,6 @@ struct AgentDetailView: View {
 
     private func load() async {
         let service = SupabaseService.shared
-        let cache = CacheStore.shared
-        // Render cached data first for instant display.
-        let cachedChannels = cache.cachedChannels(agentId: agentId)
-        let cachedRuns = cache.cachedAgentRuns(agentId: agentId, limit: 30)
-        let cachedAgents = cache.cachedAgents()
-        let cachedAgent = cachedAgents.first { $0.id == agentId }
-        if cachedAgent != nil || !cachedChannels.isEmpty {
-            agent = cachedAgent
-            channels = cachedChannels
-            runs = cachedRuns
-            isLoading = false
-        }
         do {
             async let agentTask = service.fetchAgent(id: agentId)
             async let channelsTask = service.fetchChannels(agentId: agentId)
@@ -906,12 +894,6 @@ struct AgentDetailView: View {
                 grouped[runId, default: [:]][status, default: 0] += 1
             }
             runItemCounts = grouped
-            // Persist the fresh snapshot for offline use.
-            cache.replaceAll(
-                agents: [loadedAgent],
-                channels: loadedChannels,
-                runs: loadedRuns
-            )
         } catch {
             isOffline = true
             isLoading = false

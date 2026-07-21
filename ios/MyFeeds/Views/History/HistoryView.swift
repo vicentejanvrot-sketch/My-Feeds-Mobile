@@ -136,7 +136,7 @@ struct HistoryView: View {
         HStack(spacing: 8) {
             Image(systemName: "wifi.slash")
                 .font(.system(size: 13))
-            Text("Offline — showing last synced run history.")
+            Text("Offline — couldn't load latest run history.")
                 .font(.system(size: 13, weight: .medium))
             Spacer()
             Button {
@@ -158,17 +158,6 @@ struct HistoryView: View {
 
     private func load() async {
         let service = SupabaseService.shared
-        let cache = CacheStore.shared
-        let cachedRuns = cache.cachedRuns(limit: 100)
-        let cachedAgents = cache.cachedAgents()
-        let cachedChannels = cache.cachedAllChannels()
-        let hasCache = !cachedRuns.isEmpty || !cachedAgents.isEmpty
-        if hasCache {
-            runs = cachedRuns
-            agents = Dictionary(uniqueKeysWithValues: cachedAgents.map { ($0.id, $0) })
-            channelsByAgent = Dictionary(grouping: cachedChannels, by: \.agentId)
-            isLoading = false
-        }
         do {
             async let runsTask = service.fetchRuns(limit: 100)
             async let agentsTask = service.fetchAgents()
@@ -178,13 +167,7 @@ struct HistoryView: View {
             agents = Dictionary(uniqueKeysWithValues: loadedAgents.map { ($0.id, $0) })
             channelsByAgent = Dictionary(grouping: loadedChannels, by: \.agentId)
             isOffline = false
-            cache.replaceAll(agents: loadedAgents, channels: loadedChannels, runs: loadedRuns)
         } catch {
-            if !hasCache {
-                runs = cachedRuns
-                agents = Dictionary(uniqueKeysWithValues: cachedAgents.map { ($0.id, $0) })
-                channelsByAgent = Dictionary(grouping: cachedChannels, by: \.agentId)
-            }
             isOffline = true
         }
         isLoading = false

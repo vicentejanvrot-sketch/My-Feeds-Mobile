@@ -105,7 +105,7 @@ struct AgentsView: View {
         HStack(spacing: 8) {
             Image(systemName: "wifi.slash")
                 .font(.system(size: 13))
-            Text("Offline — showing last synced agents.")
+            Text("Offline — couldn't load latest agents.")
                 .font(.system(size: 13, weight: .medium))
             Spacer()
             Button {
@@ -126,21 +126,11 @@ struct AgentsView: View {
     }
 
     private func load() async {
-        let cache = CacheStore.shared
-        let cachedAgents = cache.cachedAgents()
-        if !cachedAgents.isEmpty {
-            agents = cachedAgents
-            isLoading = false
-        }
         do {
             let loaded = try await SupabaseService.shared.fetchAgents()
             agents = loaded
             isOffline = false
-            cache.replaceAll(agents: loaded)
         } catch {
-            if cachedAgents.isEmpty {
-                agents = cachedAgents
-            }
             isOffline = true
         }
         isLoading = false

@@ -179,7 +179,7 @@ struct DashboardView: View {
         HStack(spacing: 8) {
             Image(systemName: "wifi.slash")
                 .font(.system(size: 13))
-            Text("Offline — showing last synced data.")
+            Text("Offline — couldn't load latest data.")
                 .font(.system(size: 13, weight: .medium))
             Spacer()
             Button {
@@ -203,18 +203,6 @@ struct DashboardView: View {
 
     private func load() async {
         let service = SupabaseService.shared
-        let cache = CacheStore.shared
-        // Render cached data first for instant display.
-        let cachedAgents = cache.cachedAgents()
-        let cachedRuns = cache.cachedRuns(limit: 50)
-        let cachedChannels = cache.cachedAllChannels()
-        let hasCache = !cachedAgents.isEmpty || !cachedRuns.isEmpty
-        if hasCache {
-            agents = cachedAgents
-            runs = cachedRuns
-            channels = cachedChannels
-            isLoading = false
-        }
         do {
             async let agentsTask = service.fetchAgents()
             async let runsTask = service.fetchRuns(limit: 50)
@@ -226,13 +214,7 @@ struct DashboardView: View {
             isLoading = false
             isOffline = false
             counts = (try? await service.fetchAgentItemCounts(agentIds: loadedAgents.map(\.id))) ?? [:]
-            cache.replaceAll(agents: loadedAgents, channels: loadedChannels, runs: loadedRuns)
         } catch {
-            if !hasCache {
-                agents = cachedAgents
-                runs = cachedRuns
-                channels = cachedChannels
-            }
             isOffline = true
             isLoading = false
         }

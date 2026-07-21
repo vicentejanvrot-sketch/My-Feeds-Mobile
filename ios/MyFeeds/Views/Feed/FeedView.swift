@@ -125,7 +125,7 @@ struct FeedView: View {
         HStack(spacing: 8) {
             Image(systemName: "wifi.slash")
                 .font(.system(size: 13))
-            Text("Offline — showing last synced feed data.")
+            Text("Offline — couldn't load latest feed data.")
                 .font(.system(size: 13, weight: .medium))
             Spacer()
             Button {
@@ -470,19 +470,6 @@ struct FeedView: View {
     // MARK: - Data & mutations
 
     private func load() async {
-        // Show cached data immediately so the UI is never blank.
-        let cache = CacheStore.shared
-        let cachedItems = cache.cachedFeedItems(limit: 500)
-        let cachedAgents = cache.cachedAgents()
-        let cachedChannels = cache.cachedAllChannels()
-        let hasCache = !cachedItems.isEmpty || !cachedAgents.isEmpty
-        if hasCache {
-            items = cachedItems
-            agents = cachedAgents
-            channels = cachedChannels
-            isLoading = false
-        }
-
         let service = SupabaseService.shared
         do {
             async let itemsTask = service.fetchFeedItems(limit: 500)
@@ -493,19 +480,7 @@ struct FeedView: View {
             agents = loadedAgents
             channels = loadedChannels
             isOffline = false
-            // Persist the fresh snapshot for offline use.
-            cache.replaceAll(
-                agents: loadedAgents,
-                channels: loadedChannels,
-                feedItems: loadedItems
-            )
         } catch {
-            // Network failure — fall back to cache if we have it, else show empty.
-            if !hasCache {
-                items = cachedItems
-                agents = cachedAgents
-                channels = cachedChannels
-            }
             isOffline = true
         }
         isLoading = false
@@ -526,8 +501,6 @@ struct FeedView: View {
         if let index = items.firstIndex(where: { $0.id == item.id }) {
             items[index].userStatus = status
         }
-        // Mirror the change to the local cache so it survives a refresh.
-        CacheStore.shared.updateFeedItemStatus(id: item.id, status: status)
         Task {
             do {
                 try await SupabaseService.shared.updateItemStatus(id: item.id, status: status)
@@ -535,7 +508,6 @@ struct FeedView: View {
                 if let index = items.firstIndex(where: { $0.id == item.id }) {
                     items[index].userStatus = previous
                 }
-                CacheStore.shared.updateFeedItemStatus(id: item.id, status: previous ?? .notWatched)
                 toasts.show("Couldn't update status", type: .error)
             }
         }
@@ -550,8 +522,6 @@ struct FeedView: View {
         for index in items.indices where selectedIds.contains(items[index].id) {
             items[index].userStatus = status
         }
-        // Mirror to local cache.
-        CacheStore.shared.bulkUpdateFeedItemStatus(ids: ids, status: status)
         Task {
             do {
                 try await SupabaseService.shared.bulkUpdateItemStatus(ids: ids, status: status)
@@ -560,7 +530,6 @@ struct FeedView: View {
                 selectedIds.removeAll()
             } catch {
                 items = snapshot
-                CacheStore.shared.bulkUpdateFeedItemStatus(ids: ids, status: .notWatched)
                 toasts.show("Couldn't update selected videos", type: .error)
             }
             isBulkUpdating = false
