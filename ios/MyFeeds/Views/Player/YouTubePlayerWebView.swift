@@ -117,9 +117,37 @@ struct YouTubePlayerWebView: UIViewRepresentable {
       function post(msg) {
         try { window.webkit.messageHandlers.bridge.postMessage(msg); } catch (e) {}
       }
+      function installCaptionLock() {
+        if (document.getElementById('myfeeds-caption-lock')) { return; }
+        var style = document.createElement('style');
+        style.id = 'myfeeds-caption-lock';
+        style.textContent = [
+          '.ytp-subtitles-button { display: none !important; }',
+          '.ytp-caption-window-container { display: none !important; }',
+          '.caption-window { display: none !important; }',
+          '.captions-text { display: none !important; }'
+        ].join('\\n');
+        (document.head || document.documentElement).appendChild(style);
+      }
       function disableCaptions(p) {
+        installCaptionLock();
+        try { p.setOption('captions', 'track', {}); } catch (e) {}
         try { p.unloadModule('captions'); } catch (e) {}
       }
+      document.addEventListener('keydown', function(event) {
+        if ((event.key || '').toLowerCase() === 'c') {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      }, true);
+      document.addEventListener('click', function(event) {
+        var target = event.target;
+        if (target && target.closest && target.closest('.ytp-subtitles-button')) {
+          event.preventDefault();
+          event.stopImmediatePropagation();
+        }
+      }, true);
+      installCaptionLock();
       var attached = false;
       function attach() {
         var p = document.getElementById('movie_player');
@@ -132,6 +160,9 @@ struct YouTubePlayerWebView: UIViewRepresentable {
             disableCaptions(p);
             post({event: 'state', state: state});
           });
+          p.addEventListener('onApiChange', function() {
+            disableCaptions(p);
+          });
           p.addEventListener('onError', function(code) {
             post({event: 'error', code: code});
           });
@@ -139,6 +170,7 @@ struct YouTubePlayerWebView: UIViewRepresentable {
         post({event: 'ready', duration: (typeof p.getDuration === 'function' ? p.getDuration() : 0)});
         setInterval(function() {
           try {
+            disableCaptions(p);
             post({event: 'time', time: p.getCurrentTime(), duration: p.getDuration()});
           } catch (e) {}
         }, 500);
