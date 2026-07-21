@@ -95,13 +95,25 @@ struct VideoPlayerScreen: View {
             Color.black.ignoresSafeArea()
 
             VStack(spacing: 0) {
-                playerView
+                interactivePlayerView
                     .aspectRatio(16 / 9, contentMode: .fit)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 landscapeControlsPanel
                     .opacity(areLandscapeControlsVisible ? 1 : 0)
                     .allowsHitTesting(areLandscapeControlsVisible)
+                    .overlay {
+                        if !areLandscapeControlsVisible {
+                            Button {
+                                showLandscapeControlsTemporarily()
+                            } label: {
+                                Color.clear
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Show video controls")
+                        }
+                    }
             }
 
             VStack {
@@ -126,16 +138,6 @@ struct VideoPlayerScreen: View {
             .opacity(areLandscapeControlsVisible ? 1 : 0)
             .allowsHitTesting(areLandscapeControlsVisible)
 
-            if !areLandscapeControlsVisible {
-                Button {
-                    showLandscapeControlsTemporarily()
-                } label: {
-                    Color.clear
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Show video controls")
-            }
         }
         .animation(.easeInOut(duration: 0.2), value: areLandscapeControlsVisible)
         .ignoresSafeArea()
@@ -297,7 +299,7 @@ struct VideoPlayerScreen: View {
                 }
                 .padding(20)
             } else {
-                playerView
+                interactivePlayerView
                 if !controller.isReady {
                     ProgressView()
                         .controlSize(.large)
@@ -312,6 +314,53 @@ struct VideoPlayerScreen: View {
 
     private var playerView: some View {
         YouTubePlayerWebView(videoId: request.videoId, controller: controller)
+    }
+
+    private var interactivePlayerView: some View {
+        playerView
+            .overlay {
+                GeometryReader { geometry in
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .gesture(playerTapGesture(in: geometry.size.width))
+                        .accessibilityElement()
+                        .accessibilityLabel("Video")
+                        .accessibilityAction(named: Text("Rewind 15 seconds")) {
+                            seekBy15Seconds(forward: false)
+                        }
+                        .accessibilityAction(named: Text("Forward 15 seconds")) {
+                            seekBy15Seconds(forward: true)
+                        }
+                }
+            }
+    }
+
+    private func playerTapGesture(in width: CGFloat) -> some Gesture {
+        SpatialTapGesture(count: 2)
+            .exclusively(before: SpatialTapGesture(count: 1))
+            .onEnded { value in
+                switch value {
+                case .first(let doubleTap):
+                    seekBy15Seconds(forward: doubleTap.location.x >= width / 2)
+                    if isFullscreen {
+                        showLandscapeControlsTemporarily()
+                    }
+                case .second:
+                    if isFullscreen {
+                        showLandscapeControlsTemporarily()
+                    }
+                }
+            }
+    }
+
+    private func seekBy15Seconds(forward: Bool) {
+        guard controller.isReady else { return }
+        let delta = forward ? 15.0 : -15.0
+        let upperBound = controller.duration > 0 ? controller.duration : .greatestFiniteMagnitude
+        let target = max(0, min(controller.currentTime + delta, upperBound))
+        controller.seek(to: target)
+        controller.currentTime = target
+        UIImpactFeedbackGenerator(style: .light).impactOccurred()
     }
 
     private var controlsStrip: some View {
