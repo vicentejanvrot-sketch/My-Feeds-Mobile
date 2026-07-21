@@ -65,6 +65,7 @@ struct YouTubePlayerWebView: UIViewRepresentable {
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
         webView.backgroundColor = .black
+        webView.customUserAgent = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.bounces = false
 
@@ -94,7 +95,7 @@ struct YouTubePlayerWebView: UIViewRepresentable {
         function onYouTubeIframeAPIReady(){
           player = new YT.Player('player', {
             videoId: '\(videoId)',
-            playerVars: {controls:0, playsinline:1, rel:0, modestbranding:1, fs:0, disablekb:1, cc_load_policy:0, iv_load_policy:3},
+            playerVars: {controls:0, playsinline:1, rel:0, modestbranding:1, fs:0, disablekb:1, cc_load_policy:0, iv_load_policy:3, origin:'https://www.youtube.com', enablejsapi:1},
             events: {
               onReady: function(){
                 disableCaptions();
