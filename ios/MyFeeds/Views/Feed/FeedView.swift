@@ -17,7 +17,6 @@ struct FeedView: View {
     @State private var sortMode: SortMode = .recent
 
     // Selection
-    @State private var isSelecting = false
     @State private var selectedIds: Set<String> = []
     @State private var isBulkUpdating = false
 
@@ -88,7 +87,7 @@ struct FeedView: View {
         ZStack {
             VStack(spacing: 0) {
                 header
-                if isSelecting { bulkBar }
+                if !selectedIds.isEmpty { bulkBar }
                 searchBar
                 filterStack
                 list
@@ -132,24 +131,7 @@ struct FeedView: View {
                 .font(.system(size: 26, weight: .heavy))
                 .foregroundStyle(Theme.textPrimary)
             Spacer()
-            if isSelecting {
-                Button {
-                    isSelecting = false
-                    selectedIds.removeAll()
-                } label: {
-                    Text("Cancel")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.accent)
-                }
-            } else if !isLoading {
-                Button {
-                    isSelecting = true
-                } label: {
-                    Text("Select")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundStyle(Theme.accent)
-                }
-                .padding(.trailing, 12)
+            if !isLoading {
                 Text("\(filteredItems.count) videos")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundStyle(Theme.textSecondary)
@@ -314,15 +296,13 @@ struct FeedView: View {
                     ForEach(filteredItems) { item in
                         FeedItemCard(
                             item: item,
-                            isSelecting: isSelecting,
                             isSelected: selectedIds.contains(item.id),
                             onTap: {
-                                if isSelecting {
-                                    toggleSelection(item)
-                                } else if let videoId = item.resolvedVideoId {
+                                if let videoId = item.resolvedVideoId {
                                     router.openVideo(videoId: videoId, itemId: item.id)
                                 }
                             },
+                            onSelectionTap: { toggleSelection(item) },
                             onStatusTap: { statusModalItem = item }
                         )
                     }
@@ -513,7 +493,6 @@ struct FeedView: View {
             do {
                 try await SupabaseService.shared.bulkUpdateItemStatus(ids: ids, status: status)
                 toasts.show("Updated \(ids.count) video\(ids.count == 1 ? "" : "s")")
-                isSelecting = false
                 selectedIds.removeAll()
             } catch {
                 items = snapshot
@@ -528,25 +507,46 @@ struct FeedView: View {
 
 private struct FeedItemCard: View {
     let item: FeedItem
-    let isSelecting: Bool
     let isSelected: Bool
     let onTap: () -> Void
+    let onSelectionTap: () -> Void
     let onStatusTap: () -> Void
 
     var body: some View {
-        Button(action: onTap) {
-            VStack(alignment: .leading, spacing: 0) {
-                thumbnail
-                body12
+        ZStack(alignment: .bottomTrailing) {
+            Button(action: onTap) {
+                VStack(alignment: .leading, spacing: 0) {
+                    thumbnail
+                    body12
+                }
+                .background(Theme.card)
+                .clipShape(.rect(cornerRadius: 14))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14)
+                        .stroke(isSelected ? Theme.accent : Theme.border, lineWidth: isSelected ? 2 : 0.5)
+                )
             }
-            .background(Theme.card)
-            .clipShape(.rect(cornerRadius: 14))
-            .overlay(
-                RoundedRectangle(cornerRadius: 14)
-                    .stroke(isSelected ? Theme.accent : Theme.border, lineWidth: isSelected ? 2 : 0.5)
-            )
+            .buttonStyle(.plain)
+
+            Button(action: onSelectionTap) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 5)
+                        .fill(isSelected ? Theme.accent : Theme.card)
+                    RoundedRectangle(cornerRadius: 5)
+                        .stroke(Theme.accent, lineWidth: 2)
+                    if isSelected {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 13, weight: .heavy))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .frame(width: 26, height: 26)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .padding(12)
+            .accessibilityLabel(isSelected ? "Deselect video" : "Select video")
         }
-        .buttonStyle(.plain)
     }
 
     private var thumbnail: some View {
@@ -571,23 +571,6 @@ private struct FeedItemCard: View {
                 }
                 .allowsHitTesting(false)
             }
-            .overlay(alignment: .topTrailing) {
-                if isSelecting {
-                    ZStack {
-                        if isSelected {
-                            Circle().fill(Theme.accent)
-                            Image(systemName: "checkmark")
-                                .font(.system(size: 13, weight: .heavy))
-                                .foregroundStyle(.white)
-                        } else {
-                            Circle().fill(.black.opacity(0.55))
-                            Circle().stroke(.white, lineWidth: 2)
-                        }
-                    }
-                    .frame(width: 26, height: 26)
-                    .padding(10)
-                }
-            }
             .clipped()
     }
 
@@ -601,27 +584,25 @@ private struct FeedItemCard: View {
                     .lineSpacing(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                if !isSelecting {
-                    Button(action: onStatusTap) {
-                        HStack(spacing: 4) {
-                            Image(systemName: item.status.icon)
-                                .font(.system(size: 13))
-                                .foregroundStyle(item.status.color)
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 9, weight: .semibold))
-                                .foregroundStyle(Theme.textMuted)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 5)
-                        .background(Theme.input)
-                        .clipShape(.rect(cornerRadius: 8))
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 8)
-                                .stroke(Theme.border, lineWidth: 0.5)
-                        )
+                Button(action: onStatusTap) {
+                    HStack(spacing: 4) {
+                        Image(systemName: item.status.icon)
+                            .font(.system(size: 13))
+                            .foregroundStyle(item.status.color)
+                        Image(systemName: "chevron.down")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Theme.textMuted)
                     }
-                    .buttonStyle(.plain)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 5)
+                    .background(Theme.input)
+                    .clipShape(.rect(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Theme.border, lineWidth: 0.5)
+                    )
                 }
+                .buttonStyle(.plain)
             }
 
             HStack {
