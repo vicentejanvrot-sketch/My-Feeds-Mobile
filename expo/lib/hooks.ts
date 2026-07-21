@@ -313,6 +313,52 @@ export function useUpdateItemStatus() {
   });
 }
 
+/** Update the watch status of multiple feed items in one request, optimistically. */
+export function useBulkUpdateItemStatus() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ ids, status }: { ids: string[]; status: ItemStatus }) => {
+      if (ids.length === 0) return { ids, status };
+      const { error } = await supabase
+        .from("items")
+        .update({ user_status: status })
+        .in("id", ids);
+      if (error) throw error;
+      return { ids, status };
+    },
+    onMutate: async ({ ids, status }) => {
+      await queryClient.cancelQueries({ queryKey: ["feedItems"] });
+      const previousFeed = queryClient.getQueriesData<ItemWithAnalysis[]>({
+        queryKey: ["feedItems"],
+      });
+      const selectedIds = new Set(ids);
+
+      for (const [queryKey, data] of previousFeed) {
+        if (!data) continue;
+        queryClient.setQueryData<ItemWithAnalysis[]>(queryKey, (old) =>
+          old?.map((item) =>
+            selectedIds.has(item.id) ? { ...item, user_status: status } : item,
+          ) ?? old,
+        );
+      }
+
+      return { previousFeed };
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousFeed) {
+        for (const [queryKey, data] of context.previousFeed) {
+          queryClient.setQueryData(queryKey, data);
+        }
+      }
+    },
+    onSettled: () => {
+      void queryClient.invalidateQueries({ queryKey: ["items"] });
+      void queryClient.invalidateQueries({ queryKey: ["feedItems"] });
+      void queryClient.invalidateQueries({ queryKey: ["agentItemCounts"] });
+    },
+  });
+}
+
 /**
  * The current user's settings row (email + metadata only — NEVER key columns).
  * API keys are write-only: the database revokes SELECT on those columns,

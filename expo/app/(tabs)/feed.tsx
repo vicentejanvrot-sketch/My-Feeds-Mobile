@@ -38,6 +38,7 @@ import type { ItemStatus, ItemWithAnalysis, Channel, Agent } from "@/lib/databas
 import {
   useFeedItems,
   useUpdateItemStatus,
+  useBulkUpdateItemStatus,
   useAgents,
   useChannelsAll,
   useRealtimeInvalidation,
@@ -126,6 +127,9 @@ export default function FeedScreen() {
   const agents = useAgents();
   const channels = useChannelsAll();
   const updateStatus = useUpdateItemStatus();
+  const bulkUpdateStatus = useBulkUpdateItemStatus();
+  const [selectionMode, setSelectionMode] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
 
   useRealtimeInvalidation("items", ["feedItems", 500]);
 
@@ -236,6 +240,37 @@ export default function FeedScreen() {
     [updateStatus, showToast],
   );
 
+  const toggleSelection = useCallback((id: string) => {
+    void Haptics.selectionAsync();
+    setSelectedIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }, []);
+
+  const exitSelectionMode = useCallback(() => {
+    setSelectionMode(false);
+    setSelectedIds(new Set());
+  }, []);
+
+  const applyBulkStatus = useCallback(
+    async (status: ItemStatus) => {
+      const ids = Array.from(selectedIds);
+      if (ids.length === 0) return;
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      try {
+        await bulkUpdateStatus.mutateAsync({ ids, status });
+        showToast(`Updated ${ids.length} video${ids.length === 1 ? "" : "s"}`, "success");
+        exitSelectionMode();
+      } catch {
+        showToast("Couldn't update selected videos", "error");
+      }
+    },
+    [selectedIds, bulkUpdateStatus, showToast, exitSelectionMode],
+  );
+
   const openVideo = useCallback(
     (item: ItemWithAnalysis) => {
       const vid = item.video_id?.trim() || extractYoutubeId(item.url);
@@ -246,9 +281,16 @@ export default function FeedScreen() {
 
   const renderFeedCard = useCallback(
     ({ item }: { item: ItemWithAnalysis }) => (
-      <FeedCardMemo item={item} onOpen={openVideo} onStatus={setStatus} />
+      <FeedCardMemo
+        item={item}
+        onOpen={openVideo}
+        onStatus={setStatus}
+        selectionMode={selectionMode}
+        selected={selectedIds.has(item.id)}
+        onToggleSelection={toggleSelection}
+      />
     ),
-    [openVideo, setStatus],
+    [openVideo, setStatus, selectionMode, selectedIds, toggleSelection],
   );
 
   const handleAgentChange = useCallback(
@@ -290,10 +332,30 @@ export default function FeedScreen() {
     <View style={[styles.root, isWide && styles.rootWide, { paddingTop: insets.top }]}>
       <View style={styles.headerRow}>
         <Text style={styles.heading}>Research Feed</Text>
-        {!items.isLoading ? (
+        {selectionMode ? (
+          <Pressable onPress={exitSelectionMode} hitSlop={8}>
+            <Text style={styles.selectButtonText}>Cancel</Text>
+          </Pressable>
+        ) : !items.isLoading ? (
+          <Pressable
+            style={styles.selectButton}
+            onPress={() => setSelectionMode(true)}
+          >
+            <Text style={styles.selectButtonText}>Select</Text>
+          </Pressable>
+        ) : null}
+        {!selectionMode && !items.isLoading ? (
           <Text style={styles.countBadge}>{filtered.length} videos</Text>
         ) : null}
       </View>
+
+      {selectionMode ? (
+        <BulkStatusBar
+          count={selectedIds.size}
+          loading={bulkUpdateStatus.isPending}
+          onApply={applyBulkStatus}
+        />
+      ) : null}
 
       {/* ── Search bar ─────────────────────────────────────────── */}
       <View style={styles.searchWrapper}>
@@ -575,10 +637,16 @@ const FeedCard = React.memo(function FeedCard({
   item,
   onOpen,
   onStatus,
+  selectionMode,
+  selected,
+  onToggleSelection,
 }: {
   item: ItemWithAnalysis;
   onOpen: (item: ItemWithAnalysis) => void;
   onStatus: (id: string, status: ItemStatus) => void;
+  selectionMode: boolean;
+  selected: boolean;
+  onToggleSelection: (id: string) => void;
 }) {
   const realAnalysis = useMemo(() => item.item_analysis?.[0] ?? null, [item.item_analysis]);
   // Always produce an analysis object — real fields take priority, fallback fills gaps.
@@ -605,8 +673,12 @@ const FeedCard = React.memo(function FeedCard({
 
   return (
     <Pressable
-      style={({ pressed }) => [styles.card, pressed && styles.pressed]}
-      onPress={() => onOpen(item)}
+      style={({ pressed }) => [
+        styles.card,
+        selected && styles.cardSelected,
+        pressed && styles.pressed,
+      ]}
+      onPress={() => selectionMode ? onToggleSelection(item.id) : onOpen(item)}
     >
       {/* Thumbnail */}
       <View style={styles.thumbWrap}>
@@ -623,6 +695,11 @@ const FeedCard = React.memo(function FeedCard({
         <View style={styles.playOverlay}>
           <Play size={22} color={Colors.white} fill={Colors.white} />
         </View>
+        {selectionMode ? (
+          <View style={[styles.selectionCheck, selected && styles.selectionCheckSelected]}>
+            {selected ? <Check size={17} color={Colors.white} strokeWidth={3} /> : null}
+          </View>
+        ) : null}
       </View>
 
       {/* Body */}
@@ -632,7 +709,7 @@ const FeedCard = React.memo(function FeedCard({
           <Text style={styles.title} numberOfLines={2}>
             {item.title ?? "Untitled"}
           </Text>
-          <StatusControl
+          {!selectionMode ? <StatusControl
             status={status}
             statusCfg={statusCfg}
             StatusIcon={StatusIcon}
@@ -643,7 +720,7 @@ const FeedCard = React.memo(function FeedCard({
               onStatus(item.id, s);
             }}
             onClose={() => setStatusOpen(false)}
-          />
+          /> : null}
         </View>
 
         {/* Channel avatar + name + time ago | duration */}
@@ -702,9 +779,10 @@ const FeedCard = React.memo(function FeedCard({
  *  the server data hasn't changed, but a custom comparator guarantees
  *  that only meaningful updates trigger a re-render. */
 function feedCardComparator(
-  prev: { item: ItemWithAnalysis; onOpen: (item: ItemWithAnalysis) => void; onStatus: (id: string, status: ItemStatus) => void },
-  next: { item: ItemWithAnalysis; onOpen: (item: ItemWithAnalysis) => void; onStatus: (id: string, status: ItemStatus) => void },
+  prev: { item: ItemWithAnalysis; selectionMode: boolean; selected: boolean },
+  next: { item: ItemWithAnalysis; selectionMode: boolean; selected: boolean },
 ): boolean {
+  if (prev.selectionMode !== next.selectionMode || prev.selected !== next.selected) return false;
   const pa = prev.item;
   const na = next.item;
   if (pa.id !== na.id) return false;
@@ -722,6 +800,64 @@ function feedCardComparator(
 }
 
 const FeedCardMemo = FeedCard;
+
+function BulkStatusBar({
+  count,
+  loading,
+  onApply,
+}: {
+  count: number;
+  loading: boolean;
+  onApply: (status: ItemStatus) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <View style={styles.bulkBar}>
+      <Text style={styles.bulkCount}>{count} selected</Text>
+      <Pressable
+        disabled={count === 0 || loading}
+        style={({ pressed }) => [
+          styles.bulkButton,
+          count === 0 && styles.bulkButtonDisabled,
+          pressed && count > 0 && styles.pressed,
+        ]}
+        onPress={() => setOpen(true)}
+      >
+        {loading ? <ActivityIndicator size="small" color={Colors.white} /> : (
+          <>
+            <Text style={styles.bulkButtonText}>Set status</Text>
+            <ChevronDown size={14} color={Colors.white} />
+          </>
+        )}
+      </Pressable>
+      <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setOpen(false)}>
+          <View style={styles.statusModal}>
+            <Text style={styles.statusModalTitle}>Set status for {count} videos</Text>
+            {STATUS_OPTIONS_COMPACT.map((opt) => {
+              const cfg = ITEM_STATUS_ICONS[opt.key];
+              const IconC = cfg.icon;
+              return (
+                <Pressable
+                  key={opt.key}
+                  style={({ pressed }) => [styles.statusOption, pressed && styles.pressed]}
+                  onPress={() => {
+                    setOpen(false);
+                    onApply(opt.key);
+                  }}
+                >
+                  <View style={styles.checkSlot} />
+                  <IconC size={16} color={cfg.color} />
+                  <Text style={styles.statusOptionText}>{opt.label}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </Pressable>
+      </Modal>
+    </View>
+  );
+}
 
 // ── Status Control (compact dropdown per card) ─────────────────────
 
@@ -851,6 +987,43 @@ const styles = StyleSheet.create({
     fontWeight: "600" as const,
     color: Colors.textSecondary,
   },
+  selectButton: {
+    marginLeft: "auto",
+    marginRight: 12,
+  },
+  selectButtonText: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    color: Colors.accent,
+  },
+  bulkBar: {
+    width: "100%",
+    maxWidth: 720,
+    paddingHorizontal: 16,
+    paddingBottom: 10,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+  },
+  bulkCount: {
+    fontSize: 14,
+    fontWeight: "700" as const,
+    color: Colors.textPrimary,
+  },
+  bulkButton: {
+    minWidth: 126,
+    minHeight: 40,
+    paddingHorizontal: 14,
+    borderRadius: 10,
+    backgroundColor: Colors.accent,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  bulkButtonDisabled: { opacity: 0.4 },
+  bulkButtonText: { color: Colors.white, fontSize: 14, fontWeight: "700" as const },
 
   // Search wrapper (aligns search with filters)
   searchWrapper: {
@@ -1066,6 +1239,10 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: Colors.border,
   },
+  cardSelected: {
+    borderColor: Colors.accent,
+    borderWidth: 2,
+  },
   thumbWrap: {
     width: "100%",
     aspectRatio: 16 / 9,
@@ -1083,6 +1260,20 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     backgroundColor: "rgba(0,0,0,0.15)",
   },
+  selectionCheck: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    borderWidth: 2,
+    borderColor: Colors.white,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectionCheckSelected: { backgroundColor: Colors.accent, borderColor: Colors.accent },
 
   // Card body
   cardBody: { padding: 12 },
