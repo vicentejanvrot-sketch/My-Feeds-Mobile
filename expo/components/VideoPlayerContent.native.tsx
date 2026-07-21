@@ -273,6 +273,11 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           width={boxWidth}
           height={boxHeight}
           videoId={videoId}
+          // Avoid the library's third-party GitHub Pages controller URL. Its
+          // referrer does not match our declared player origin and current
+          // YouTube WebView validation rejects that combination with 152-4.
+          useLocalHTML
+          baseUrlOverride="https://rork.com/"
           play={shouldPlay}
           volume={nativeVolume}
           mute={nativeMuted}
@@ -306,10 +311,9 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
             rel: 0,
             playsinline: 1,
             preventFullScreen: true,
-            // YouTube's privacy-enhanced origin avoids the 152-4 player
-            // configuration error that its current mobile WebView checks can
-            // return for the regular youtube.com origin.
-            origin: "https://www.youtube-nocookie.com",
+            // Must match the base URL assigned to the locally generated page
+            // so YouTube receives consistent origin and referrer identities.
+            origin: "https://rork.com",
           }}
         />
       </View>
