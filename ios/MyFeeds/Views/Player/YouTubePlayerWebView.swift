@@ -2,6 +2,7 @@ import SwiftUI
 import WebKit
 
 /// Commands sent from Swift to the embedded YouTube IFrame player.
+/// Backed by the embed page's internal `movie_player` element, exposed as `window.player`.
 @Observable
 final class YouTubePlayerController {
     fileprivate weak var webView: WKWebView?
@@ -47,7 +48,7 @@ final class YouTubePlayerController {
     func setVolume(_ volume: Int) { evaluate("player.setVolume(\(max(0, min(volume, 100))));") }
 }
 
-/// WKWebView hosting the YouTube IFrame API with a JS→Swift bridge.
+/// WKWebView hosting the YouTube embed page with a JS→Swift bridge.
 struct YouTubePlayerWebView: UIViewRepresentable {
     let videoId: String
     let controller: YouTubePlayerController
@@ -62,6 +63,17 @@ struct YouTubePlayerWebView: UIViewRepresentable {
         config.mediaTypesRequiringUserActionForPlayback = []
         config.userContentController.add(context.coordinator, name: "bridge")
 
+        // Bridge script: attaches to the embed page's internal player element.
+        // We load the embed page directly (real network request with a Referer)
+        // because YouTube now rejects players loaded from local HTML without
+        // a Referer header (errors 152/153).
+        let userScript = WKUserScript(
+            source: Self.bridgeScript,
+            injectionTime: .atDocumentEnd,
+            forMainFrameOnly: true
+        )
+        config.userContentController.addUserScript(userScript)
+
         let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
         webView.backgroundColor = .black
@@ -70,7 +82,23 @@ struct YouTubePlayerWebView: UIViewRepresentable {
         webView.scrollView.bounces = false
 
         controller.webView = webView
-        webView.loadHTMLString(html, baseURL: URL(string: "https://www.youtube.com"))
+
+        var components = URLComponents(string: "https://www.youtube.com/embed/\(videoId)")!
+        components.queryItems = [
+            URLQueryItem(name: "playsinline", value: "1"),
+            URLQueryItem(name: "controls", value: "0"),
+            URLQueryItem(name: "rel", value: "0"),
+            URLQueryItem(name: "modestbranding", value: "1"),
+            URLQueryItem(name: "fs", value: "0"),
+            URLQueryItem(name: "disablekb", value: "1"),
+            URLQueryItem(name: "cc_load_policy", value: "0"),
+            URLQueryItem(name: "iv_load_policy", value: "3"),
+            URLQueryItem(name: "enablejsapi", value: "1"),
+        ]
+        var request = URLRequest(url: components.url!)
+        // YouTube requires a Referer to validate embedded playback.
+        request.setValue("https://myfeeds.app/", forHTTPHeaderField: "Referer")
+        webView.load(request)
         return webView
     }
 
@@ -80,49 +108,53 @@ struct YouTubePlayerWebView: UIViewRepresentable {
         uiView.configuration.userContentController.removeScriptMessageHandler(forName: "bridge")
     }
 
-    private var html: String {
-        """
-        <!DOCTYPE html><html><head>
-        <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <style>html,body{margin:0;padding:0;background:#000;height:100%;overflow:hidden}
-        #player{position:absolute;top:0;left:0;width:100%;height:100%}</style>
-        </head><body>
-        <div id="player"></div>
-        <script src="https://www.youtube.com/iframe_api"></script>
-        <script>
-        var player;
-        function post(msg){window.webkit.messageHandlers.bridge.postMessage(msg);}
-        function onYouTubeIframeAPIReady(){
-          player = new YT.Player('player', {
-            videoId: '\(videoId)',
-            playerVars: {controls:0, playsinline:1, rel:0, modestbranding:1, fs:0, disablekb:1, cc_load_policy:0, iv_load_policy:3, origin:'https://www.youtube.com', enablejsapi:1},
-            events: {
-              onReady: function(){
-                disableCaptions();
-                setTimeout(disableCaptions, 500);
-                post({event:'ready', duration: player.getDuration()});
-              },
-              onStateChange: function(e){
-                disableCaptions();
-                post({event:'state', state: e.data});
-              },
-              onError: function(e){ post({event:'error', code: e.data}); }
-            }
+    /// Injected into the YouTube embed page. Attaches to the internal
+    /// `movie_player` element and mirrors events to the Swift bridge.
+    private static let bridgeScript = """
+    (function() {
+      if (window.__myfeedsBridgeInstalled) { return; }
+      window.__myfeedsBridgeInstalled = true;
+      function post(msg) {
+        try { window.webkit.messageHandlers.bridge.postMessage(msg); } catch (e) {}
+      }
+      function disableCaptions(p) {
+        try { p.unloadModule('captions'); } catch (e) {}
+      }
+      var attached = false;
+      function attach() {
+        var p = document.getElementById('movie_player');
+        if (!p || typeof p.getPlayerState !== 'function') { return false; }
+        attached = true;
+        window.player = p;
+        disableCaptions(p);
+        try {
+          p.addEventListener('onStateChange', function(state) {
+            disableCaptions(p);
+            post({event: 'state', state: state});
           });
-        }
-        function disableCaptions(){
-          if(!player) return;
-          try { player.unloadModule('captions'); } catch(e) {}
-        }
-        setInterval(function(){
-          if(player && player.getCurrentTime){
-            post({event:'time', time: player.getCurrentTime(), duration: player.getDuration()});
-          }
+          p.addEventListener('onError', function(code) {
+            post({event: 'error', code: code});
+          });
+        } catch (e) {}
+        post({event: 'ready', duration: (typeof p.getDuration === 'function' ? p.getDuration() : 0)});
+        setInterval(function() {
+          try {
+            post({event: 'time', time: p.getCurrentTime(), duration: p.getDuration()});
+          } catch (e) {}
         }, 500);
-        </script>
-        </body></html>
-        """
-    }
+        return true;
+      }
+      var tries = 0;
+      var timer = setInterval(function() {
+        tries++;
+        if (attach()) { clearInterval(timer); return; }
+        if (tries > 40) {
+          clearInterval(timer);
+          if (!attached) { post({event: 'error', code: -1}); }
+        }
+      }, 250);
+    })();
+    """
 
     final class Coordinator: NSObject, WKScriptMessageHandler {
         let controller: YouTubePlayerController
