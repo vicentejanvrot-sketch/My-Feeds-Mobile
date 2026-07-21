@@ -8,15 +8,12 @@ struct FeedView: View {
     @State private var agents: [Agent] = []
     @State private var channels: [Channel] = []
     @State private var isLoading = true
-    @State private var isOffline = false
 
     // Filters
     @State private var search = ""
     @State private var agentFilter: String? = nil
     @State private var channelFilter: String? = nil
-    // Show every video on first load. Users can narrow this to Not Watched
-    // (or another status) from the status filter.
-    @State private var statusFilter: ItemStatus? = nil
+    @State private var statusFilter: ItemStatus? = .notWatched
     @State private var sortMode: SortMode = .recent
 
     // Selection
@@ -91,7 +88,6 @@ struct FeedView: View {
         ZStack {
             VStack(spacing: 0) {
                 header
-                if isOffline { offlineBanner }
                 if isSelecting { bulkBar }
                 searchBar
                 filterStack
@@ -120,29 +116,6 @@ struct FeedView: View {
                 if let status = request.status { statusFilter = status }
                 router.feedRequest = nil
             }
-        }
-    }
-
-    private var offlineBanner: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "wifi.slash")
-                .font(.system(size: 13))
-            Text("Offline — couldn't load latest feed data.")
-                .font(.system(size: 13, weight: .medium))
-            Spacer()
-            Button {
-                Task { await load() }
-            } label: {
-                Text("Retry")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Theme.accent)
-            }
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(Color(hsl: 38, 92, 50, alpha: 0.16))
-        .overlay(alignment: .bottom) {
-            Rectangle().fill(Color(hsl: 38, 92, 50, alpha: 0.3)).frame(height: 0.5)
         }
     }
 
@@ -357,7 +330,7 @@ struct FeedView: View {
     }
 
     private var emptyState: some View {
-        let hasFilters = !search.isEmpty || agentFilter != nil || channelFilter != nil || statusFilter != nil
+        let hasFilters = !search.isEmpty || agentFilter != nil || channelFilter != nil || statusFilter != .notWatched
         return VStack(spacing: 6) {
             Text(hasFilters ? "No videos match your filters" : "No videos yet")
                 .font(.system(size: 16, weight: .bold))
@@ -480,9 +453,7 @@ struct FeedView: View {
         // leaves the iOS feed blank.
         do {
             items = try await service.fetchFeedItems(limit: 500)
-            isOffline = false
         } catch {
-            isOffline = true
             toasts.show("Couldn't load videos: \(error.localizedDescription)", type: .error)
         }
 
