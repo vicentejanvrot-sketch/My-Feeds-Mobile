@@ -22,6 +22,8 @@ struct VideoPlayerScreen: View {
     @State private var isScrubbing = false
     @State private var scrubTime: Double = 0
     @State private var showLoadError = false
+    @State private var areLandscapeControlsVisible = true
+    @State private var landscapeControlsTask: Task<Void, Never>?
     @State private var savePositionTask: Task<Void, Never>?
 
     private var watchURL: String { "https://www.youtube.com/watch?v=\(request.videoId)" }
@@ -53,6 +55,7 @@ struct VideoPlayerScreen: View {
         .sheet(isPresented: $showShareSheet) { shareSheet }
         .onAppear { startPlayerLifecycle() }
         .onDisappear {
+            landscapeControlsTask?.cancel()
             savePositionTask?.cancel()
             persistPosition()
             if prefs.keepScreenOn {
@@ -102,6 +105,8 @@ struct VideoPlayerScreen: View {
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
 
                 landscapeControlsPanel
+                    .opacity(areLandscapeControlsVisible ? 1 : 0)
+                    .allowsHitTesting(areLandscapeControlsVisible)
             }
 
             VStack {
@@ -123,7 +128,21 @@ struct VideoPlayerScreen: View {
                 }
                 Spacer()
             }
+            .opacity(areLandscapeControlsVisible ? 1 : 0)
+            .allowsHitTesting(areLandscapeControlsVisible)
+
+            if !areLandscapeControlsVisible {
+                Button {
+                    showLandscapeControlsTemporarily()
+                } label: {
+                    Color.clear
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Show video controls")
+            }
         }
+        .animation(.easeInOut(duration: 0.2), value: areLandscapeControlsVisible)
         .ignoresSafeArea()
     }
 
@@ -358,6 +377,11 @@ struct VideoPlayerScreen: View {
 
             Button {
                 isFullscreen.toggle()
+                if isFullscreen {
+                    showLandscapeControlsTemporarily()
+                } else {
+                    resetLandscapeControls()
+                }
             } label: {
                 Image(systemName: fullscreen
                       ? "arrow.down.right.and.arrow.up.left"
@@ -653,7 +677,30 @@ struct VideoPlayerScreen: View {
             withAnimation(.easeInOut(duration: 0.2)) {
                 isFullscreen = isLandscape
             }
+            if isLandscape {
+                showLandscapeControlsTemporarily()
+            } else {
+                resetLandscapeControls()
+            }
         }
+    }
+
+    private func showLandscapeControlsTemporarily() {
+        landscapeControlsTask?.cancel()
+        areLandscapeControlsVisible = true
+        landscapeControlsTask = Task {
+            try? await Task.sleep(for: .seconds(3))
+            guard !Task.isCancelled, isFullscreen else { return }
+            withAnimation(.easeOut(duration: 0.2)) {
+                areLandscapeControlsVisible = false
+            }
+        }
+    }
+
+    private func resetLandscapeControls() {
+        landscapeControlsTask?.cancel()
+        landscapeControlsTask = nil
+        areLandscapeControlsVisible = true
     }
 
     private func startPlayerLifecycle() {
