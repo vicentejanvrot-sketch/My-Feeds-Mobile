@@ -121,32 +121,52 @@ struct VideoPlayerScreen: View {
             .allowsHitTesting(areLandscapeControlsVisible)
 
         }
-        .animation(.easeInOut(duration: 0.2), value: areLandscapeControlsVisible)
+        .animation(.smooth(duration: 0.4), value: areLandscapeControlsVisible)
         .ignoresSafeArea()
     }
 
     private var fullscreenPlayerAndControls: some View {
         GeometryReader { geometry in
-            let shouldReserveControlsSpace =
-                verticalSizeClass != .compact || areLandscapeControlsVisible
-            let reservedHeight = shouldReserveControlsSpace
-                ? landscapeControlsHeight
-                : 0
-            let playerHeight = max(geometry.size.height - reservedHeight, 0)
+            let aspectHeight = geometry.size.width * 9 / 16
+            let expandedHeight = min(geometry.size.height, aspectHeight)
+            let expandedWidth = expandedHeight * 16 / 9
+            let collapsedAreaHeight = max(
+                geometry.size.height - landscapeControlsHeight,
+                0
+            )
+            let collapsedHeight = min(collapsedAreaHeight, aspectHeight)
+            let phoneScale = areLandscapeControlsVisible && expandedHeight > 0
+                ? collapsedHeight / expandedHeight
+                : 1
 
             ZStack(alignment: .bottom) {
-                interactivePlayerView
-                    .aspectRatio(16 / 9, contentMode: .fit)
-                    .frame(width: geometry.size.width, height: playerHeight)
-                    .frame(
-                        maxWidth: .infinity,
-                        maxHeight: .infinity,
-                        alignment: .top
-                    )
-                    .animation(
-                        .easeInOut(duration: 0.28),
-                        value: playerHeight
-                    )
+                if verticalSizeClass == .compact {
+                    // Keep WKWebView at a constant layout size and animate a
+                    // GPU-backed transform. Resizing the WebView every frame
+                    // makes video expansion noticeably choppy on iPhone.
+                    interactivePlayerView
+                        .frame(width: expandedWidth, height: expandedHeight)
+                        .scaleEffect(phoneScale, anchor: .top)
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .top
+                        )
+                        .animation(.smooth(duration: 0.4), value: phoneScale)
+                } else {
+                    // Preserve the existing tablet landscape behavior.
+                    interactivePlayerView
+                        .aspectRatio(16 / 9, contentMode: .fit)
+                        .frame(
+                            width: geometry.size.width,
+                            height: collapsedAreaHeight
+                        )
+                        .frame(
+                            maxWidth: .infinity,
+                            maxHeight: .infinity,
+                            alignment: .top
+                        )
+                }
 
                 landscapeControlsLayer
                     .onGeometryChange(for: CGFloat.self) { proxy in
@@ -761,11 +781,13 @@ struct VideoPlayerScreen: View {
 
     private func showLandscapeControlsTemporarily() {
         landscapeControlsTask?.cancel()
-        areLandscapeControlsVisible = true
+        withAnimation(.smooth(duration: 0.4)) {
+            areLandscapeControlsVisible = true
+        }
         landscapeControlsTask = Task {
             try? await Task.sleep(for: .seconds(3))
             guard !Task.isCancelled, isFullscreen else { return }
-            withAnimation(.easeOut(duration: 0.2)) {
+            withAnimation(.smooth(duration: 0.4)) {
                 areLandscapeControlsVisible = false
             }
         }
