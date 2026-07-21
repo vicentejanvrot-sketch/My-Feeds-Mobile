@@ -24,6 +24,7 @@ struct VideoPlayerScreen: View {
     @State private var scrubTime: Double = 0
     @State private var showLoadError = false
     @State private var areLandscapeControlsVisible = true
+    @State private var landscapeControlsHeight: CGFloat = 112
     @State private var landscapeControlsTask: Task<Void, Never>?
     @State private var savePositionTask: Task<Void, Never>?
 
@@ -124,27 +125,36 @@ struct VideoPlayerScreen: View {
         .ignoresSafeArea()
     }
 
-    @ViewBuilder
     private var fullscreenPlayerAndControls: some View {
-        if verticalSizeClass == .compact && !areLandscapeControlsVisible {
-            // On phones in landscape, reclaim the controls area only after
-            // the controls fade out. The aspect-fit video can then use the
-            // entire screen without stretching or cropping.
+        GeometryReader { geometry in
+            let shouldReserveControlsSpace =
+                verticalSizeClass != .compact || areLandscapeControlsVisible
+            let reservedHeight = shouldReserveControlsSpace
+                ? landscapeControlsHeight
+                : 0
+            let playerHeight = max(geometry.size.height - reservedHeight, 0)
+
             ZStack(alignment: .bottom) {
                 interactivePlayerView
                     .aspectRatio(16 / 9, contentMode: .fit)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .frame(width: geometry.size.width, height: playerHeight)
+                    .frame(
+                        maxWidth: .infinity,
+                        maxHeight: .infinity,
+                        alignment: .top
+                    )
+                    .animation(
+                        .easeInOut(duration: 0.28),
+                        value: playerHeight
+                    )
 
                 landscapeControlsLayer
-            }
-        } else {
-            // Preserve the existing tablet landscape layout.
-            VStack(spacing: 0) {
-                interactivePlayerView
-                    .aspectRatio(16 / 9, contentMode: .fit)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                landscapeControlsLayer
+                    .onGeometryChange(for: CGFloat.self) { proxy in
+                        proxy.size.height
+                    } action: { newHeight in
+                        guard newHeight > 0 else { return }
+                        landscapeControlsHeight = newHeight
+                    }
             }
         }
     }
