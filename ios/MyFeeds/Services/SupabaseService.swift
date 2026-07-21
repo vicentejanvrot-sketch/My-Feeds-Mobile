@@ -15,8 +15,8 @@ final class SupabaseService {
         encoder.keyEncodingStrategy = .convertToSnakeCase
 
         client = SupabaseClient(
-            supabaseURL: URL(string: Config.EXPO_PUBLIC_SUPABASE_URL) ?? URL(string: "https://invalid.supabase.co")!,
-            supabaseKey: Config.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+            supabaseURL: URL(string: StaticConfig.supabaseURL)!,
+            supabaseKey: StaticConfig.supabaseAnonKey,
             options: SupabaseClientOptions(
                 db: .init(encoder: encoder, decoder: decoder)
             )
