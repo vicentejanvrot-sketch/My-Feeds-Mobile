@@ -33,7 +33,7 @@ struct MainTabView: View {
                 FeedView()
                     .withAppRoutes()
             }
-            .tabItem { Label("Feed", systemImage: "dot.radiowaves.left.and.right") }
+            .tabItem { Label("Feed", systemImage: "dot.radiowaves.right") }
             .tag(AppTab.feed)
 
             NavigationStack {
