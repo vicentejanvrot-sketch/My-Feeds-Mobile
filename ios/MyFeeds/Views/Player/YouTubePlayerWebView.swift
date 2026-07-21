@@ -24,6 +24,17 @@ final class YouTubePlayerController {
 
     func play() { evaluate("player.playVideo();") }
     func pause() { evaluate("player.pauseVideo();") }
+    func togglePlayback() {
+        // Query the IFrame directly instead of relying on the asynchronously
+        // mirrored Swift state, which can lag behind the actual player.
+        evaluate("""
+        (function() {
+          if (!player || !player.getPlayerState) return;
+          if (player.getPlayerState() === 1) player.pauseVideo();
+          else player.playVideo();
+        })();
+        """)
+    }
     func seek(to seconds: Double) { evaluate("player.seekTo(\(seconds), true);") }
     func skip(_ delta: Double) {
         let target = max(0, min(currentTime + delta, duration > 0 ? duration : .greatestFiniteMagnitude))
@@ -34,11 +45,6 @@ final class YouTubePlayerController {
     func mute() { evaluate("player.mute();") }
     func unmute() { evaluate("player.unMute();") }
     func setVolume(_ volume: Int) { evaluate("player.setVolume(\(max(0, min(volume, 100))));") }
-    func setCaptions(_ enabled: Bool) {
-        evaluate(enabled
-                 ? "player.loadModule('captions'); player.setOption('captions','track',{'languageCode':'en'});"
-                 : "player.unloadModule('captions');")
-    }
 }
 
 /// WKWebView hosting the YouTube IFrame API with a JS→Swift bridge.
@@ -88,13 +94,24 @@ struct YouTubePlayerWebView: UIViewRepresentable {
         function onYouTubeIframeAPIReady(){
           player = new YT.Player('player', {
             videoId: '\(videoId)',
-            playerVars: {controls:0, playsinline:1, rel:0, modestbranding:1, fs:0, disablekb:1},
+            playerVars: {controls:0, playsinline:1, rel:0, modestbranding:1, fs:0, disablekb:1, cc_load_policy:0, iv_load_policy:3},
             events: {
-              onReady: function(){ post({event:'ready', duration: player.getDuration()}); },
-              onStateChange: function(e){ post({event:'state', state: e.data}); },
+              onReady: function(){
+                disableCaptions();
+                setTimeout(disableCaptions, 500);
+                post({event:'ready', duration: player.getDuration()});
+              },
+              onStateChange: function(e){
+                disableCaptions();
+                post({event:'state', state: e.data});
+              },
               onError: function(e){ post({event:'error', code: e.data}); }
             }
           });
+        }
+        function disableCaptions(){
+          if(!player) return;
+          try { player.unloadModule('captions'); } catch(e) {}
         }
         setInterval(function(){
           if(player && player.getCurrentTime){

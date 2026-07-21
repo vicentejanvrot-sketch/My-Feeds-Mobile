@@ -18,7 +18,6 @@ struct VideoPlayerScreen: View {
     @State private var showWatchedOverlay = false
     @State private var markedWatchedOnce = false
     @State private var isMuted = false
-    @State private var captionsOn = false
     @State private var isScrubbing = false
     @State private var scrubTime: Double = 0
     @State private var showLoadError = false
@@ -29,17 +28,23 @@ struct VideoPlayerScreen: View {
     private var displayTime: Double { isScrubbing ? scrubTime : controller.currentTime }
 
     var body: some View {
-        ZStack {
-            Theme.background.ignoresSafeArea()
+        GeometryReader { geometry in
+            ZStack {
+                Theme.background.ignoresSafeArea()
 
-            if isFullscreen {
-                fullscreenLayout
-            } else {
-                portraitLayout
+                if isFullscreen {
+                    fullscreenLayout
+                } else {
+                    portraitLayout
+                }
+
+                if showWatchedOverlay {
+                    watchedOverlay
+                }
             }
-
-            if showWatchedOverlay {
-                watchedOverlay
+            .onAppear { updateFullscreen(for: geometry.size) }
+            .onChange(of: geometry.size) { _, newSize in
+                updateFullscreen(for: newSize)
             }
         }
         .statusBarHidden(isFullscreen)
@@ -131,6 +136,7 @@ struct VideoPlayerScreen: View {
                 Spacer()
             }
         }
+        .ignoresSafeArea()
     }
 
     // MARK: - Header & rows
@@ -409,11 +415,7 @@ struct VideoPlayerScreen: View {
 
             Button {
                 UIImpactFeedbackGenerator(style: .light).impactOccurred()
-                if controller.isPlaying {
-                    controller.pause()
-                } else {
-                    controller.play()
-                }
+                controller.togglePlayback()
             } label: {
                 Image(systemName: controller.isPlaying ? "pause.fill" : "play.fill")
                     .font(.system(size: 22 * iconScale))
@@ -453,17 +455,6 @@ struct VideoPlayerScreen: View {
                     .clipShape(Circle())
             }
 
-            Button {
-                captionsOn.toggle()
-                controller.setCaptions(captionsOn)
-            } label: {
-                Text("CC")
-                    .font(.system(size: 13, weight: .heavy))
-                    .foregroundStyle(captionsOn ? Theme.accent : .white)
-                    .frame(width: 36, height: 36)
-                    .background(.white.opacity(captionsOn ? 0.22 : 0.12))
-                    .clipShape(Circle())
-            }
         }
         .frame(maxWidth: .infinity)
     }
@@ -598,6 +589,16 @@ struct VideoPlayerScreen: View {
     }
 
     // MARK: - Lifecycle & behavior
+
+    private func updateFullscreen(for size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
+        let isLandscape = size.width > size.height
+        if isLandscape != isFullscreen {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isFullscreen = isLandscape
+            }
+        }
+    }
 
     private func startPlayerLifecycle() {
         if prefs.keepScreenOn {
