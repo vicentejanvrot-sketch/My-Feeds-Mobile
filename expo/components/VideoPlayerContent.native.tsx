@@ -273,11 +273,6 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           width={boxWidth}
           height={boxHeight}
           videoId={videoId}
-          // Avoid the library's third-party GitHub Pages controller URL. Its
-          // referrer does not match our declared player origin and current
-          // YouTube WebView validation rejects that combination with 152-4.
-          useLocalHTML
-          baseUrlOverride="https://rork.com/"
           play={shouldPlay}
           volume={nativeVolume}
           mute={nativeMuted}
@@ -290,6 +285,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
             mediaPlaybackRequiresUserAction: false,
             injectedJavaScript: INJECTED_JS,
             style: { width: boxWidth, height: boxHeight, backgroundColor: "transparent" },
+            userAgent:
+              "Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
             allowsFullscreenVideo: true,
             domStorageEnabled: true,
             thirdPartyCookiesEnabled: true,
@@ -306,14 +303,11 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           }}
           initialPlayerParams={{
             controls: false,
-            showClosedCaptions: false,
             modestbranding: 1,
             rel: 0,
             playsinline: 1,
             preventFullScreen: true,
-            // Must match the base URL assigned to the locally generated page
-            // so YouTube receives consistent origin and referrer identities.
-            origin: "https://rork.com",
+            origin: "https://www.youtube.com",
           }}
         />
       </View>
