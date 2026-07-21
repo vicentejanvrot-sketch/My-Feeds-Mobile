@@ -19,35 +19,35 @@ struct MainTabView: View {
                 DashboardView()
                     .withAppRoutes()
             }
-            .tabItem { Label("Dashboard", systemImage: "square.grid.2x2") }
+            .tabItem { Label("Dashboard", image: "TabDashboardIcon") }
             .tag(AppTab.dashboard)
 
             NavigationStack {
                 AgentsView()
                     .withAppRoutes()
             }
-            .tabItem { Label("Agents", systemImage: "robot") }
+            .tabItem { Label("Agents", image: "TabAgentsIcon") }
             .tag(AppTab.agents)
 
             NavigationStack {
                 FeedView()
                     .withAppRoutes()
             }
-            .tabItem { Label("Feed", systemImage: "dot.radiowaves.right") }
+            .tabItem { Label("Feed", image: "TabFeedIcon") }
             .tag(AppTab.feed)
 
             NavigationStack {
                 HistoryView()
                     .withAppRoutes()
             }
-            .tabItem { Label("History", systemImage: "clock") }
+            .tabItem { Label("History", image: "TabHistoryIcon") }
             .tag(AppTab.history)
 
             NavigationStack {
                 SettingsView()
                     .withAppRoutes()
             }
-            .tabItem { Label("Settings", systemImage: "gearshape") }
+            .tabItem { Label("Settings", image: "TabSettingsIcon") }
             .tag(AppTab.settings)
         }
         .tint(Theme.accent)
