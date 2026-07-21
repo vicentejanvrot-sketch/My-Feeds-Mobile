@@ -10,6 +10,7 @@ struct VideoPlayerScreen: View {
     @Environment(ToastCenter.self) private var toasts
     @Environment(VideoPrefs.self) private var prefs
     @Environment(\.openURL) private var openURL
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @State private var controller = YouTubePlayerController()
     @State private var isFullscreen = false
@@ -94,27 +95,7 @@ struct VideoPlayerScreen: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            VStack(spacing: 0) {
-                interactivePlayerView
-                    .aspectRatio(16 / 9, contentMode: .fit)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-                landscapeControlsPanel
-                    .opacity(areLandscapeControlsVisible ? 1 : 0)
-                    .allowsHitTesting(areLandscapeControlsVisible)
-                    .overlay {
-                        if !areLandscapeControlsVisible {
-                            Button {
-                                showLandscapeControlsTemporarily()
-                            } label: {
-                                Color.clear
-                                    .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Show video controls")
-                        }
-                    }
-            }
+            fullscreenPlayerAndControls
 
             VStack {
                 HStack {
@@ -141,6 +122,49 @@ struct VideoPlayerScreen: View {
         }
         .animation(.easeInOut(duration: 0.2), value: areLandscapeControlsVisible)
         .ignoresSafeArea()
+    }
+
+    @ViewBuilder
+    private var fullscreenPlayerAndControls: some View {
+        if verticalSizeClass == .compact && !areLandscapeControlsVisible {
+            // On phones in landscape, reclaim the controls area only after
+            // the controls fade out. The aspect-fit video can then use the
+            // entire screen without stretching or cropping.
+            ZStack(alignment: .bottom) {
+                interactivePlayerView
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                landscapeControlsLayer
+            }
+        } else {
+            // Preserve the existing tablet landscape layout.
+            VStack(spacing: 0) {
+                interactivePlayerView
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                landscapeControlsLayer
+            }
+        }
+    }
+
+    private var landscapeControlsLayer: some View {
+        landscapeControlsPanel
+            .opacity(areLandscapeControlsVisible ? 1 : 0)
+            .allowsHitTesting(areLandscapeControlsVisible)
+            .overlay {
+                if !areLandscapeControlsVisible {
+                    Button {
+                        showLandscapeControlsTemporarily()
+                    } label: {
+                        Color.clear
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show video controls")
+                }
+            }
     }
 
     // MARK: - Header & rows
