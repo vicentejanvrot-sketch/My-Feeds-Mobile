@@ -25,8 +25,6 @@ export interface VideoPlayerHandle {
   mute: () => Promise<void>;
   /** Unmute audio. */
   unMute: () => Promise<void>;
-  /** Toggle YouTube captions module on or off. */
-  setCaptions: (on: boolean) => Promise<void>;
 }
 
 interface VideoPlayerContentProps {
@@ -136,11 +134,6 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       sendCommand("unMute");
     }, [sendCommand]);
 
-    const setCaptions = useCallback(async (on: boolean) => {
-      // YouTube IFrame API: toggle the captions ('cc') module on/off.
-      sendCommand(on ? "loadModule" : "unloadModule", "captions");
-    }, [sendCommand]);
-
     const togglePlayback = useCallback(async () => {
       // Use the internally tracked playing state (updated by infoDelivery
       // events) so the toggle is always correct regardless of parent sync.
@@ -243,8 +236,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
       mute,
       unMute,
       togglePlayback,
-      setCaptions,
-    }), [play, pause, seekTo, setVolume, mute, unMute, togglePlayback, setCaptions]);
+    }), [play, pause, seekTo, setVolume, mute, unMute, togglePlayback]);
 
     // ── Cleanup poll interval on unmount ────────────────
     useEffect(() => {
@@ -320,7 +312,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     const embedUrl = (() => {
       let url =
         `https://www.youtube.com/embed/${videoId}` +
-        `?playsinline=1&controls=0&modestbranding=1&rel=0&enablejsapi=1`;
+        `?playsinline=1&controls=0&modestbranding=1&rel=0&enablejsapi=1&cc_load_policy=0`;
       if (typeof window !== "undefined" && window.location?.origin) {
         url += `&origin=${encodeURIComponent(window.location.origin)}`;
       }

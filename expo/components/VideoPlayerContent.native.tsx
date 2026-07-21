@@ -28,8 +28,6 @@ export interface VideoPlayerHandle {
   mute: () => Promise<void>;
   /** Unmute audio. No-op on native. */
   unMute: () => Promise<void>;
-  /** Toggle YouTube captions module on or off. */
-  setCaptions: (on: boolean) => Promise<void>;
 }
 
 /**
@@ -108,6 +106,13 @@ const INJECTED_JS = `
     }
   }, 200);
 
+  // Captions are intentionally not part of this app's player UI. YouTube can
+  // restore a viewer's saved caption preference, so keep the module unloaded.
+  setInterval(function() {
+    if (!window.player || typeof window.player.unloadModule !== 'function') return;
+    try { window.player.unloadModule('captions'); } catch(_) {}
+  }, 500);
+
   (function enforceFill(){
     var s=document.createElement('style');
     s.textContent='html,body{margin:0!important;padding:0!important;background:#000!important;overflow:hidden!important;width:100%!important;height:100%!important}'+
@@ -158,11 +163,8 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     const [shouldPlay, setShouldPlay] = useState(false);
     const [nativeVolume, setNativeVolume] = useState(100);
     const [nativeMuted, setNativeMuted] = useState(false);
-    /** Tracks actual YouTube playback state from onChangeState events.
-     *  Kept in a ref so togglePlayback can decide play vs pause correctly
-     *  even when shouldPlay (the React state driving the `play` prop) is
-     *  stale relative to the real player. */
-    const isPlayingRef = useRef(false);
+    /** Last play/pause state requested by our own transport control. */
+    const requestedPlayingRef = useRef(false);
 
     /** Inject JavaScript that calls a method on the YouTube IFrame API player.
      *  This is the direct fallback that bypasses the library's broken v2.4.x
@@ -185,25 +187,26 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     // postMessage pipe in v2.4.x. The YouTube IFrame API player is stored
     // as a global `player` variable by the library's iframe.html.
     const play = useCallback(async () => {
+      requestedPlayingRef.current = true;
       setShouldPlay(true);
       injectPlayerJS('try{if(window.player&&player.playVideo){player.playVideo();}}catch(e){} true;');
     }, [injectPlayerJS]);
 
     const pause = useCallback(async () => {
+      requestedPlayingRef.current = false;
       setShouldPlay(false);
       injectPlayerJS('try{if(window.player&&player.pauseVideo){player.pauseVideo();}}catch(e){} true;');
     }, [injectPlayerJS]);
 
     const togglePlayback = useCallback(async () => {
-      // Use the actual playback state tracked from onChangeState events
-      // rather than the shouldPlay React state, which can drift from reality.
-      if (isPlayingRef.current) {
-        setShouldPlay(false);
-        injectPlayerJS('try{if(window.player&&player.pauseVideo){player.pauseVideo();}}catch(e){} true;');
-      } else {
-        setShouldPlay(true);
-        injectPlayerJS('try{if(window.player&&player.playVideo){player.playVideo();}}catch(e){} true;');
-      }
+      // Flip the requested state on every press. Player-state callbacks can be
+      // delayed or omitted by WKWebView, so they must not decide the command.
+      const next = !requestedPlayingRef.current;
+      requestedPlayingRef.current = next;
+      setShouldPlay(next);
+      injectPlayerJS(next
+        ? 'try{if(window.player&&player.playVideo){player.playVideo();}}catch(e){} true;'
+        : 'try{if(window.player&&player.pauseVideo){player.pauseVideo();}}catch(e){} true;');
     }, [injectPlayerJS]);
 
     const seekTo = useCallback(async (seconds: number) => {
@@ -241,15 +244,6 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
         injectPlayerJS('try{if(window.player&&player.unMute){player.unMute();}}catch(e){} true;');
       },
       togglePlayback,
-      setCaptions: async (on: boolean) => {
-        // Toggle YouTube's captions module via the IFrame API player object.
-        // loadModule('captions') shows CC; unloadModule('captions') hides them.
-        if (on) {
-          injectPlayerJS('try{if(window.player&&player.loadModule){player.loadModule("captions");player.setOption("captions","track",{});}}catch(e){} true;');
-        } else {
-          injectPlayerJS('try{if(window.player&&player.unloadModule){player.unloadModule("captions");}}catch(e){} true;');
-        }
-      },
     }), [play, pause, seekTo, togglePlayback, injectPlayerJS]);
 
     /** Intercept onChangeState to keep shouldPlay in sync with the real
@@ -260,10 +254,10 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
     const handleStateChange = useCallback(
       (event: string) => {
         if (event === "playing") {
-          isPlayingRef.current = true;
+          requestedPlayingRef.current = true;
           setShouldPlay(true);
         } else if (event === "paused" || event === "ended" || event === "unstarted") {
-          isPlayingRef.current = false;
+          requestedPlayingRef.current = false;
           setShouldPlay(false);
         }
         onChangeState?.(event);
@@ -316,6 +310,7 @@ const VideoPlayerContent = forwardRef<VideoPlayerHandle, VideoPlayerContentProps
           }}
           initialPlayerParams={{
             controls: false,
+            showClosedCaptions: false,
             modestbranding: 1,
             rel: 0,
             playsinline: 1,

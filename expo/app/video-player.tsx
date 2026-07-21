@@ -224,7 +224,6 @@ export default function VideoPlayerScreen() {
     }
     watchedOverlayOpacity.setValue(0);
     setWatchedOverlayVisible(false);
-    setCaptionsOn(false);
   }, [videoIdStr, watchedOverlayOpacity]);
 
   const [gearOpen, setGearOpen] = useState(false);
@@ -235,7 +234,6 @@ export default function VideoPlayerScreen() {
   // ── Volume state ───────────────────────────────────────────
   const [volume, setVolumeState] = useState(100);
   const [isMuted, setIsMuted] = useState(false);
-  const [captionsOn, setCaptionsOn] = useState(false);
   const volumeRef = useRef(volume);
   const isMutedRef = useRef(isMuted);
 
@@ -601,14 +599,6 @@ export default function VideoPlayerScreen() {
       setIsMuted(true);
     }
   }, [resetControlsTimer]);
-
-  const handleToggleCaptions = useCallback(async () => {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    resetControlsTimer();
-    const next = !captionsOn;
-    await playerRef.current?.setCaptions(next);
-    setCaptionsOn(next);
-  }, [captionsOn, resetControlsTimer]);
 
   const handleVolumeChange = useCallback(
     async (v: number) => {
@@ -1271,25 +1261,6 @@ export default function VideoPlayerScreen() {
                 </View>
               </View>
             )}
-            {/* CC toggle */}
-            <Pressable
-              onPress={handleToggleCaptions}
-              style={({ pressed }) => [
-                styles.volumeBtn,
-                captionsOn && styles.ccBtnActive,
-                pressed && styles.volumeBtnPressed,
-              ]}
-              hitSlop={8}
-            >
-              <Text
-                style={[
-                  styles.ccLabel,
-                  { color: captionsOn ? Colors.accent : Colors.white },
-                ]}
-              >
-                CC
-              </Text>
-            </Pressable>
           </View>
         </Animated.View>
       )}
@@ -1448,25 +1419,6 @@ export default function VideoPlayerScreen() {
                 </View>
               </View>
             )}
-            {/* CC toggle (fullscreen) */}
-            <Pressable
-              onPress={handleToggleCaptions}
-              style={({ pressed }) => [
-                styles.volumeBtn,
-                captionsOn && styles.ccBtnActive,
-                pressed && styles.volumeBtnPressed,
-              ]}
-              hitSlop={8}
-            >
-              <Text
-                style={[
-                  styles.ccLabel,
-                  { color: captionsOn ? Colors.accent : Colors.white },
-                ]}
-              >
-                CC
-              </Text>
-            </Pressable>
           </View>
           {/* Speed pills */}
           <View style={[styles.fullscreenControlsRow, styles.fullscreenControlsRowTop, { paddingHorizontal: 0 }]}>
@@ -2230,14 +2182,6 @@ const styles = StyleSheet.create({
   },
   volumeBtnPressed: {
     backgroundColor: "rgba(255,255,255,0.25)",
-  },
-  ccBtnActive: {
-    backgroundColor: "rgba(255,255,255,0.22)",
-  },
-  ccLabel: {
-    fontSize: 13,
-    fontWeight: "800" as const,
-    letterSpacing: 0.5,
   },
   volumeSliderArea: {
     width: 80,
