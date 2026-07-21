@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import * as ScreenOrientation from "expo-screen-orientation";
+import { StatusBar } from "expo-status-bar";
 import { LinearGradient } from "expo-linear-gradient";
 import VideoPlayerContent from "@/components/VideoPlayerContent";
 import type { VideoPlayerHandle } from "@/components/VideoPlayerContent";
@@ -510,6 +511,22 @@ export default function VideoPlayerScreen() {
   }, []);
 
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
+  const isAutoLandscapeFullscreen =
+    Platform.OS !== "web" && windowWidth > windowHeight;
+  const autoLandscapeRef = useRef(false);
+
+  // Device rotation gets a video-only presentation. Keep this separate from
+  // the manual expand flow so rotating back restores the normal portrait UI.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    if (isAutoLandscapeFullscreen) {
+      autoLandscapeRef.current = true;
+      setIsFullscreen(true);
+    } else if (autoLandscapeRef.current) {
+      autoLandscapeRef.current = false;
+      setIsFullscreen(false);
+    }
+  }, [isAutoLandscapeFullscreen]);
 
   // Embedded (non-fullscreen) player sizing — 16:9, full-width on tablet/desktop
   const EMBED_H_MARGIN = windowWidth >= 700 ? 24 : 0;
@@ -920,6 +937,7 @@ export default function VideoPlayerScreen() {
 
   return (
     <View style={[styles.root, !isFullscreen && { marginTop: insets.top }]}>
+      <StatusBar hidden={isFullscreen} style="light" />
       {/* Chrome: hidden in fullscreen */}
       {!isFullscreen && (
         <>
@@ -1266,7 +1284,7 @@ export default function VideoPlayerScreen() {
       )}
 
       {/* ── Fullscreen bottom bar (progress + transport + volume + speed + countdown) ── */}
-      {isFullscreen && ready && (
+      {isFullscreen && ready && !isAutoLandscapeFullscreen && (
         <Animated.View
           style={[
             styles.fullscreenBottomBar,
@@ -1436,7 +1454,7 @@ export default function VideoPlayerScreen() {
       )}
 
       {/* Fullscreen close button — root level so it renders above all overlays */}
-      {isFullscreen && (
+      {isFullscreen && !isAutoLandscapeFullscreen && (
         <Animated.View
           style={[
             styles.fullscreenCloseBtnRoot,
@@ -1459,7 +1477,7 @@ export default function VideoPlayerScreen() {
 
       {/* Tap overlay — reveals controls when hidden. Rendered at root level
           with high zIndex so it sits above ALL other content elements. */}
-      {controlsHidden && (
+      {controlsHidden && !isAutoLandscapeFullscreen && (
         <Pressable
           style={[StyleSheet.absoluteFill, styles.tapOverlay]}
           onPress={resetControlsTimer}
