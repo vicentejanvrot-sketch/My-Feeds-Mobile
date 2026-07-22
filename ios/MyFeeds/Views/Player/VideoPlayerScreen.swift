@@ -24,7 +24,8 @@ struct VideoPlayerScreen: View {
     @State private var isScrubbing = false
     @State private var scrubTime: Double = 0
     @State private var showLoadError = false
-    @State private var isPortraitFullscreen = false
+    @State private var isDeviceLandscape = false
+    @State private var hasManualFullscreenPreference = false
     @State private var areLandscapeControlsVisible = true
     @State private var landscapeControlsHeight: CGFloat = 112
     @State private var landscapeControlsTask: Task<Void, Never>?
@@ -33,6 +34,12 @@ struct VideoPlayerScreen: View {
     private var watchURL: String { "https://www.youtube.com/watch?v=\(request.videoId)" }
 
     private var displayTime: Double { isScrubbing ? scrubTime : controller.currentTime }
+
+    private var usesPortraitFullscreenLayout: Bool {
+        isFullscreen
+            && horizontalSizeClass == .compact
+            && !isDeviceLandscape
+    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -93,7 +100,7 @@ struct VideoPlayerScreen: View {
         )
         let collapsedHeight = min(collapsedAreaHeight, aspectHeight)
         let isPhoneLandscape = isFullscreen
-            && !isPortraitFullscreen
+            && !usesPortraitFullscreenLayout
             && verticalSizeClass == .compact
         let phoneScale = isPhoneLandscape
             && areLandscapeControlsVisible
@@ -104,7 +111,7 @@ struct VideoPlayerScreen: View {
             ? (isPhoneLandscape ? expandedWidth : size.width)
             : size.width
         let playerHeight = isFullscreen
-            ? (isPortraitFullscreen
+            ? (usesPortraitFullscreenLayout
                 ? size.height
                 : (isPhoneLandscape ? expandedHeight : collapsedHeight))
             : aspectHeight
@@ -131,9 +138,9 @@ struct VideoPlayerScreen: View {
                             topTrailingRadius: isFullscreen ? 0 : 10
                         )
                     )
-                    .animation(.smooth(duration: 0.4), value: playerWidth)
-                    .animation(.smooth(duration: 0.4), value: playerHeight)
-                    .animation(.smooth(duration: 0.4), value: phoneScale)
+                    .animation(.smooth(duration: 0.55), value: playerWidth)
+                    .animation(.smooth(duration: 0.55), value: playerHeight)
+                    .animation(.smooth(duration: 0.55), value: phoneScale)
 
                 if !isFullscreen {
                     controlsStrip
@@ -149,7 +156,7 @@ struct VideoPlayerScreen: View {
                         .onGeometryChange(for: CGFloat.self) { proxy in
                             proxy.size.height
                         } action: { newHeight in
-                            guard !isPortraitFullscreen, newHeight > 0 else { return }
+                            guard !usesPortraitFullscreenLayout, newHeight > 0 else { return }
                             landscapeControlsHeight = newHeight
                         }
                 }
@@ -168,7 +175,7 @@ struct VideoPlayerScreen: View {
                 fullscreenCloseButton
             }
         }
-        .animation(.smooth(duration: 0.4), value: areLandscapeControlsVisible)
+        .animation(.smooth(duration: 0.5), value: areLandscapeControlsVisible)
         .ignoresSafeArea(edges: isFullscreen ? .all : Edge.Set())
     }
 
@@ -200,7 +207,7 @@ struct VideoPlayerScreen: View {
 
     private var fullscreenControlsLayer: some View {
         Group {
-            if isPortraitFullscreen {
+            if usesPortraitFullscreenLayout {
                 portraitFullscreenControlsPanel
             } else {
                 landscapeControlsPanel
@@ -786,61 +793,42 @@ struct VideoPlayerScreen: View {
     // MARK: - Lifecycle & behavior
 
     private func toggleFullscreen() {
-        if isFullscreen {
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isFullscreen = false
-                isPortraitFullscreen = false
-            }
-            resetLandscapeControls()
-            return
+        let enteringFullscreen = !isFullscreen
+        hasManualFullscreenPreference = true
+
+        withAnimation(.smooth(duration: 0.5)) {
+            isFullscreen = enteringFullscreen
         }
 
-        let isPortraitPhone = horizontalSizeClass == .compact
-            && verticalSizeClass != .compact
-
-        if isPortraitPhone {
-            // Keep the device in portrait. YouTube preserves the video's
-            // aspect fit inside a fullscreen portrait canvas while the same
-            // WKWebView continues playing without interruption.
-            isPortraitFullscreen = true
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isFullscreen = true
-            }
+        if enteringFullscreen {
             showLandscapeControlsTemporarily()
         } else {
-            isPortraitFullscreen = false
-            withAnimation(.easeInOut(duration: 0.2)) {
-                isFullscreen = true
-            }
-            showLandscapeControlsTemporarily()
+            resetLandscapeControls()
         }
     }
 
     private func updateFullscreen(for size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         let isLandscape = size.width > size.height
+        let orientationChanged = isLandscape != isDeviceLandscape
 
-        // Hiding the status bar changes portrait geometry. Keep manual
-        // portrait fullscreen active through those safe-area updates.
-        if isPortraitFullscreen && !isLandscape {
-            return
-        }
+        guard orientationChanged else { return }
 
-        if isLandscape && isPortraitFullscreen {
-            isPortraitFullscreen = false
-            showLandscapeControlsTemporarily()
-        }
+        withAnimation(.smooth(duration: 0.5)) {
+            isDeviceLandscape = isLandscape
 
-        if isLandscape != isFullscreen {
-            withAnimation(.easeInOut(duration: 0.2)) {
+            // Before the user explicitly chooses Expand or Collapse, retain
+            // automatic landscape fullscreen. After a manual choice, rotation
+            // only changes the layout and never overrides that choice.
+            if !hasManualFullscreenPreference {
                 isFullscreen = isLandscape
             }
-            if isLandscape {
-                showLandscapeControlsTemporarily()
-            } else {
-                isPortraitFullscreen = false
-                resetLandscapeControls()
-            }
+        }
+
+        if isFullscreen {
+            showLandscapeControlsTemporarily()
+        } else {
+            resetLandscapeControls()
         }
     }
 
