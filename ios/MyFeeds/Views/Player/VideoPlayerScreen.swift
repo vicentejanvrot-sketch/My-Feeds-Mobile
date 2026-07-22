@@ -37,11 +37,7 @@ struct VideoPlayerScreen: View {
             ZStack {
                 Theme.background.ignoresSafeArea()
 
-                if isFullscreen {
-                    fullscreenLayout
-                } else {
-                    portraitLayout
-                }
+                adaptivePlayerLayout(in: geometry.size)
 
                 if showWatchedOverlay {
                     watchedOverlay
@@ -68,7 +64,7 @@ struct VideoPlayerScreen: View {
 
     // MARK: - Layouts
 
-    private var portraitLayout: some View {
+    private var portraitChrome: some View {
         VStack(spacing: 0) {
             header
             speedPillsRow
@@ -82,22 +78,85 @@ struct VideoPlayerScreen: View {
                 .padding(.top, 10)
             openInYouTubeRow
                 .padding(.top, 8)
-
-            videoArea
-                .padding(.top, 10)
-
-            controlsStrip
-
-            Spacer()
         }
     }
 
-    private var fullscreenLayout: some View {
+    private func adaptivePlayerLayout(in size: CGSize) -> some View {
+        let aspectHeight = size.width * 9 / 16
+        let expandedHeight = min(size.height, aspectHeight)
+        let expandedWidth = expandedHeight * 16 / 9
+        let collapsedAreaHeight = max(
+            size.height - landscapeControlsHeight,
+            0
+        )
+        let collapsedHeight = min(collapsedAreaHeight, aspectHeight)
+        let isPhoneLandscape = isFullscreen && verticalSizeClass == .compact
+        let phoneScale = isPhoneLandscape
+            && areLandscapeControlsVisible
+            && expandedHeight > 0
+                ? collapsedHeight / expandedHeight
+                : 1
+        let playerWidth = isFullscreen
+            ? (isPhoneLandscape ? expandedWidth : size.width)
+            : size.width
+        let playerHeight = isFullscreen
+            ? (isPhoneLandscape ? expandedHeight : collapsedHeight)
+            : aspectHeight
+
+        return ZStack {
+            Color.black
+                .ignoresSafeArea()
+                .opacity(isFullscreen ? 1 : 0)
+
+            // This VStack and persistentVideoArea never change identity when
+            // orientation changes, so WKWebView keeps playing uninterrupted.
+            VStack(spacing: 0) {
+                if !isFullscreen {
+                    portraitChrome
+                }
+
+                persistentVideoArea
+                    .frame(width: playerWidth, height: playerHeight)
+                    .scaleEffect(phoneScale, anchor: .top)
+                    .padding(.top, isFullscreen ? 0 : 10)
+                    .clipShape(
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: isFullscreen ? 0 : 10,
+                            topTrailingRadius: isFullscreen ? 0 : 10
+                        )
+                    )
+                    .animation(.smooth(duration: 0.4), value: playerWidth)
+                    .animation(.smooth(duration: 0.4), value: playerHeight)
+                    .animation(.smooth(duration: 0.4), value: phoneScale)
+
+                if !isFullscreen {
+                    controlsStrip
+                }
+
+                Spacer(minLength: 0)
+            }
+
+            if isFullscreen {
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    landscapeControlsLayer
+                        .onGeometryChange(for: CGFloat.self) { proxy in
+                            proxy.size.height
+                        } action: { newHeight in
+                            guard newHeight > 0 else { return }
+                            landscapeControlsHeight = newHeight
+                        }
+                }
+
+                fullscreenCloseButton
+            }
+        }
+        .animation(.smooth(duration: 0.4), value: areLandscapeControlsVisible)
+        .ignoresSafeArea(edges: isFullscreen ? .all : Edge.Set())
+    }
+
+    private var fullscreenCloseButton: some View {
         ZStack {
-            Color.black.ignoresSafeArea()
-
-            fullscreenPlayerAndControls
-
             VStack {
                 HStack {
                     Spacer()
@@ -119,63 +178,6 @@ struct VideoPlayerScreen: View {
             }
             .opacity(areLandscapeControlsVisible ? 1 : 0)
             .allowsHitTesting(areLandscapeControlsVisible)
-
-        }
-        .animation(.smooth(duration: 0.4), value: areLandscapeControlsVisible)
-        .ignoresSafeArea()
-    }
-
-    private var fullscreenPlayerAndControls: some View {
-        GeometryReader { geometry in
-            let aspectHeight = geometry.size.width * 9 / 16
-            let expandedHeight = min(geometry.size.height, aspectHeight)
-            let expandedWidth = expandedHeight * 16 / 9
-            let collapsedAreaHeight = max(
-                geometry.size.height - landscapeControlsHeight,
-                0
-            )
-            let collapsedHeight = min(collapsedAreaHeight, aspectHeight)
-            let phoneScale = areLandscapeControlsVisible && expandedHeight > 0
-                ? collapsedHeight / expandedHeight
-                : 1
-
-            ZStack(alignment: .bottom) {
-                if verticalSizeClass == .compact {
-                    // Keep WKWebView at a constant layout size and animate a
-                    // GPU-backed transform. Resizing the WebView every frame
-                    // makes video expansion noticeably choppy on iPhone.
-                    interactivePlayerView
-                        .frame(width: expandedWidth, height: expandedHeight)
-                        .scaleEffect(phoneScale, anchor: .top)
-                        .frame(
-                            maxWidth: .infinity,
-                            maxHeight: .infinity,
-                            alignment: .top
-                        )
-                        .animation(.smooth(duration: 0.4), value: phoneScale)
-                } else {
-                    // Preserve the existing tablet landscape behavior.
-                    interactivePlayerView
-                        .aspectRatio(16 / 9, contentMode: .fit)
-                        .frame(
-                            width: geometry.size.width,
-                            height: collapsedAreaHeight
-                        )
-                        .frame(
-                            maxWidth: .infinity,
-                            maxHeight: .infinity,
-                            alignment: .top
-                        )
-                }
-
-                landscapeControlsLayer
-                    .onGeometryChange(for: CGFloat.self) { proxy in
-                        proxy.size.height
-                    } action: { newHeight in
-                        guard newHeight > 0 else { return }
-                        landscapeControlsHeight = newHeight
-                    }
-            }
         }
     }
 
@@ -323,7 +325,7 @@ struct VideoPlayerScreen: View {
 
     // MARK: - Video & controls
 
-    private var videoArea: some View {
+    private var persistentVideoArea: some View {
         ZStack {
             Color.black
             if showLoadError {
@@ -361,9 +363,6 @@ struct VideoPlayerScreen: View {
                 }
             }
         }
-        .aspectRatio(16 / 9, contentMode: .fit)
-        .frame(maxWidth: .infinity)
-        .clipShape(UnevenRoundedRectangle(topLeadingRadius: 10, topTrailingRadius: 10))
     }
 
     private var playerView: some View {
