@@ -22,7 +22,7 @@ Your data is stored securely in our backend. API keys are stored write-only and 
 
 ## Data Retention and Deletion
 
-We retain your data for as long as your account is active. You can permanently delete your account and all associated data at any time directly within the app by going to Settings and selecting "Delete Account." This removes your data — including your agents, feeds, watch history, and saved settings — and the deletion takes effect immediately and cannot be undone. If you prefer, or if you need assistance, you can also request deletion by emailing [support@travelone.ca](mailto:support@travelone.ca), and we will complete the deletion within 30 days.
+We retain your data for as long as your account is active. You can permanently delete your account and all associated data at any time directly within the app by going to Settings and selecting "Delete Account." This removes your data — including your agents, feeds, watch history, and saved settings — and the deletion takes effect immediately and cannot be undone. If you prefer, or if you need assistance, you can also request deletion by emailing [support@myfeeds.ca](mailto:support@myfeeds.ca), and we will complete the deletion within 30 days.
 
 ## Children's Privacy
 
