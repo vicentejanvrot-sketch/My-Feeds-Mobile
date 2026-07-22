@@ -126,6 +126,9 @@ struct VideoPlayerScreen: View {
                     portraitChrome
                 }
 
+                // Let iOS animate its continuously changing rotation
+                // geometry. Animating every intermediate width/height
+                // separately caused stacked, visibly stepped transitions.
                 persistentVideoArea
                     .frame(width: playerWidth, height: playerHeight)
                     .scaleEffect(phoneScale, anchor: .top)
@@ -136,9 +139,6 @@ struct VideoPlayerScreen: View {
                             topTrailingRadius: isFullscreen ? 0 : 10
                         )
                     )
-                    .animation(.smooth(duration: 0.55), value: playerWidth)
-                    .animation(.smooth(duration: 0.55), value: playerHeight)
-                    .animation(.smooth(duration: 0.55), value: phoneScale)
 
                 if !isFullscreen {
                     controlsStrip
@@ -173,7 +173,8 @@ struct VideoPlayerScreen: View {
                 fullscreenCloseButton
             }
         }
-        .animation(.smooth(duration: 0.5), value: areLandscapeControlsVisible)
+        .animation(.smooth(duration: 0.42), value: isDeviceLandscape)
+        .animation(.smooth(duration: 0.35), value: areLandscapeControlsVisible)
         .ignoresSafeArea(edges: isFullscreen ? .all : Edge.Set())
     }
 
@@ -812,20 +813,21 @@ struct VideoPlayerScreen: View {
 
         guard orientationChanged else { return }
 
-        withAnimation(.smooth(duration: 0.5)) {
-            isDeviceLandscape = isLandscape
+        // The system already animates the window geometry during rotation.
+        // Update orientation once without starting competing animations for
+        // each intermediate size reported by GeometryReader.
+        isDeviceLandscape = isLandscape
 
-            // Before the user explicitly chooses Expand or Collapse, retain
-            // automatic landscape fullscreen. After a manual choice, rotation
-            // only changes the layout and never overrides that choice.
-            if !hasManualFullscreenPreference {
-                isFullscreen = isLandscape
-            }
+        // Before the user explicitly chooses Expand or Collapse, retain
+        // automatic landscape fullscreen. After a manual choice, rotation
+        // only changes the layout and never overrides that choice.
+        if !hasManualFullscreenPreference {
+            isFullscreen = isLandscape
         }
 
-        if isFullscreen {
+        if isFullscreen && areLandscapeControlsVisible {
             showLandscapeControlsTemporarily()
-        } else {
+        } else if !isFullscreen {
             resetLandscapeControls()
         }
     }
