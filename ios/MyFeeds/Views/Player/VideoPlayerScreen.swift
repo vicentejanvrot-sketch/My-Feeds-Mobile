@@ -10,7 +10,6 @@ struct VideoPlayerScreen: View {
     @Environment(ToastCenter.self) private var toasts
     @Environment(VideoPrefs.self) private var prefs
     @Environment(\.openURL) private var openURL
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @State private var controller = YouTubePlayerController()
@@ -37,7 +36,6 @@ struct VideoPlayerScreen: View {
 
     private var usesPortraitFullscreenLayout: Bool {
         isFullscreen
-            && horizontalSizeClass == .compact
             && !isDeviceLandscape
     }
 
