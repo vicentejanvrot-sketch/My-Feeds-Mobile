@@ -10,6 +10,7 @@ struct VideoPlayerScreen: View {
     @Environment(ToastCenter.self) private var toasts
     @Environment(VideoPrefs.self) private var prefs
     @Environment(\.openURL) private var openURL
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     @State private var controller = YouTubePlayerController()
@@ -23,6 +24,7 @@ struct VideoPlayerScreen: View {
     @State private var isScrubbing = false
     @State private var scrubTime: Double = 0
     @State private var showLoadError = false
+    @State private var manualFullscreenRequested = false
     @State private var areLandscapeControlsVisible = true
     @State private var landscapeControlsHeight: CGFloat = 112
     @State private var landscapeControlsTask: Task<Void, Never>?
@@ -469,12 +471,7 @@ struct VideoPlayerScreen: View {
                 .frame(minWidth: 40)
 
             Button {
-                isFullscreen.toggle()
-                if isFullscreen {
-                    showLandscapeControlsTemporarily()
-                } else {
-                    resetLandscapeControls()
-                }
+                toggleFullscreen()
             } label: {
                 Image(systemName: fullscreen
                       ? "arrow.down.right.and.arrow.up.left"
@@ -763,6 +760,51 @@ struct VideoPlayerScreen: View {
 
     // MARK: - Lifecycle & behavior
 
+    private func toggleFullscreen() {
+        if isFullscreen {
+            if manualFullscreenRequested {
+                // A portrait-phone expand request entered landscape. Return
+                // the interface to portrait and let the geometry callback
+                // restore the portrait chrome around the same WKWebView.
+                requestInterfaceOrientation(.portrait)
+            } else {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    isFullscreen = false
+                }
+                resetLandscapeControls()
+            }
+            return
+        }
+
+        let isPortraitPhone = horizontalSizeClass == .compact
+            && verticalSizeClass != .compact
+
+        if isPortraitPhone {
+            // A 16:9 video cannot become larger in portrait without cropping
+            // or stretching. Rotate the interface into the same fitted
+            // landscape presentation used when the device is turned.
+            manualFullscreenRequested = true
+            requestInterfaceOrientation(.landscape)
+        } else {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isFullscreen = true
+            }
+            showLandscapeControlsTemporarily()
+        }
+    }
+
+    private func requestInterfaceOrientation(_ orientations: UIInterfaceOrientationMask) {
+        guard let windowScene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive }) else {
+            return
+        }
+
+        windowScene.requestGeometryUpdate(
+            .iOS(interfaceOrientations: orientations)
+        )
+    }
+
     private func updateFullscreen(for size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         let isLandscape = size.width > size.height
@@ -773,6 +815,7 @@ struct VideoPlayerScreen: View {
             if isLandscape {
                 showLandscapeControlsTemporarily()
             } else {
+                manualFullscreenRequested = false
                 resetLandscapeControls()
             }
         }
