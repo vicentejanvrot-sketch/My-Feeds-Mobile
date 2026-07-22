@@ -34,4 +34,4 @@ We may update this Privacy Policy from time to time. Material changes will be re
 
 ## Contact Us
 
-If you have questions about this Privacy Policy or your data, contact us at [support@travelone.ca](mailto:support@travelone.ca).
+If you have questions about this Privacy Policy or your data, contact us at [support@myfeeds.ca](mailto:support@myfeeds.ca).
