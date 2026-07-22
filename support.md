@@ -4,7 +4,7 @@ Need help with **My Feeds**? We're here for you.
 
 ## Contact
 
-- **Email:** support@travelone.ca
+- **Email:** support@myfeeds.ca
 
 We aim to respond to all support requests within 1–2 business days.
 
@@ -29,12 +29,12 @@ On the sign-in screen, tap **Forgot password** and follow the instructions
 sent to your email.
 
 ### How do I delete my account or data?
-Email us at **support@travelone.ca** with your request and we'll process it
+Email us at **support@myfeeds.ca** with your request and we'll process it
 promptly.
 
 ## Reporting a Problem
 
-If something isn't working, please email **support@travelone.ca** with:
+If something isn't working, please email **support@myfeeds.ca** with:
 
 - The device and OS version you're using
 - A short description of the issue
