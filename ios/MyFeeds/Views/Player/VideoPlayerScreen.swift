@@ -24,7 +24,7 @@ struct VideoPlayerScreen: View {
     @State private var isScrubbing = false
     @State private var scrubTime: Double = 0
     @State private var showLoadError = false
-    @State private var manualFullscreenRequested = false
+    @State private var isPortraitFullscreen = false
     @State private var areLandscapeControlsVisible = true
     @State private var landscapeControlsHeight: CGFloat = 112
     @State private var landscapeControlsTask: Task<Void, Never>?
@@ -92,7 +92,9 @@ struct VideoPlayerScreen: View {
             0
         )
         let collapsedHeight = min(collapsedAreaHeight, aspectHeight)
-        let isPhoneLandscape = isFullscreen && verticalSizeClass == .compact
+        let isPhoneLandscape = isFullscreen
+            && !isPortraitFullscreen
+            && verticalSizeClass == .compact
         let phoneScale = isPhoneLandscape
             && areLandscapeControlsVisible
             && expandedHeight > 0
@@ -102,7 +104,9 @@ struct VideoPlayerScreen: View {
             ? (isPhoneLandscape ? expandedWidth : size.width)
             : size.width
         let playerHeight = isFullscreen
-            ? (isPhoneLandscape ? expandedHeight : collapsedHeight)
+            ? (isPortraitFullscreen
+                ? size.height
+                : (isPhoneLandscape ? expandedHeight : collapsedHeight))
             : aspectHeight
 
         return ZStack {
@@ -141,13 +145,24 @@ struct VideoPlayerScreen: View {
             if isFullscreen {
                 VStack(spacing: 0) {
                     Spacer(minLength: 0)
-                    landscapeControlsLayer
+                    fullscreenControlsLayer
                         .onGeometryChange(for: CGFloat.self) { proxy in
                             proxy.size.height
                         } action: { newHeight in
-                            guard newHeight > 0 else { return }
+                            guard !isPortraitFullscreen, newHeight > 0 else { return }
                             landscapeControlsHeight = newHeight
                         }
+                }
+
+                if !areLandscapeControlsVisible {
+                    Button {
+                        showLandscapeControlsTemporarily()
+                    } label: {
+                        Color.clear
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Show video controls")
                 }
 
                 fullscreenCloseButton
@@ -183,22 +198,16 @@ struct VideoPlayerScreen: View {
         }
     }
 
-    private var landscapeControlsLayer: some View {
-        landscapeControlsPanel
+    private var fullscreenControlsLayer: some View {
+        Group {
+            if isPortraitFullscreen {
+                portraitFullscreenControlsPanel
+            } else {
+                landscapeControlsPanel
+            }
+        }
             .opacity(areLandscapeControlsVisible ? 1 : 0)
             .allowsHitTesting(areLandscapeControlsVisible)
-            .overlay {
-                if !areLandscapeControlsVisible {
-                    Button {
-                        showLandscapeControlsTemporarily()
-                    } label: {
-                        Color.clear
-                            .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Show video controls")
-                }
-            }
     }
 
     // MARK: - Header & rows
@@ -447,6 +456,22 @@ struct VideoPlayerScreen: View {
             .padding(.bottom, 12)
         }
         .background(Color.black)
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(.white.opacity(0.12))
+                .frame(height: 1)
+        }
+    }
+
+    private var portraitFullscreenControlsPanel: some View {
+        VStack(spacing: 4) {
+            progressRow(fullscreen: true)
+            transportRow(iconScale: 1)
+            volumeControl
+                .frame(maxWidth: 260)
+                .padding(.bottom, 14)
+        }
+        .background(Color.black.opacity(0.88))
         .overlay(alignment: .top) {
             Rectangle()
                 .fill(.white.opacity(0.12))
@@ -762,17 +787,11 @@ struct VideoPlayerScreen: View {
 
     private func toggleFullscreen() {
         if isFullscreen {
-            if manualFullscreenRequested {
-                // A portrait-phone expand request entered landscape. Return
-                // the interface to portrait and let the geometry callback
-                // restore the portrait chrome around the same WKWebView.
-                requestInterfaceOrientation(.portrait)
-            } else {
-                withAnimation(.easeInOut(duration: 0.2)) {
-                    isFullscreen = false
-                }
-                resetLandscapeControls()
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isFullscreen = false
+                isPortraitFullscreen = false
             }
+            resetLandscapeControls()
             return
         }
 
@@ -780,12 +799,16 @@ struct VideoPlayerScreen: View {
             && verticalSizeClass != .compact
 
         if isPortraitPhone {
-            // A 16:9 video cannot become larger in portrait without cropping
-            // or stretching. Rotate the interface into the same fitted
-            // landscape presentation used when the device is turned.
-            manualFullscreenRequested = true
-            requestInterfaceOrientation(.landscape)
+            // Keep the device in portrait. YouTube preserves the video's
+            // aspect fit inside a fullscreen portrait canvas while the same
+            // WKWebView continues playing without interruption.
+            isPortraitFullscreen = true
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isFullscreen = true
+            }
+            showLandscapeControlsTemporarily()
         } else {
+            isPortraitFullscreen = false
             withAnimation(.easeInOut(duration: 0.2)) {
                 isFullscreen = true
             }
@@ -793,21 +816,21 @@ struct VideoPlayerScreen: View {
         }
     }
 
-    private func requestInterfaceOrientation(_ orientations: UIInterfaceOrientationMask) {
-        guard let windowScene = UIApplication.shared.connectedScenes
-            .compactMap({ $0 as? UIWindowScene })
-            .first(where: { $0.activationState == .foregroundActive }) else {
-            return
-        }
-
-        windowScene.requestGeometryUpdate(
-            .iOS(interfaceOrientations: orientations)
-        )
-    }
-
     private func updateFullscreen(for size: CGSize) {
         guard size.width > 0, size.height > 0 else { return }
         let isLandscape = size.width > size.height
+
+        // Hiding the status bar changes portrait geometry. Keep manual
+        // portrait fullscreen active through those safe-area updates.
+        if isPortraitFullscreen && !isLandscape {
+            return
+        }
+
+        if isLandscape && isPortraitFullscreen {
+            isPortraitFullscreen = false
+            showLandscapeControlsTemporarily()
+        }
+
         if isLandscape != isFullscreen {
             withAnimation(.easeInOut(duration: 0.2)) {
                 isFullscreen = isLandscape
@@ -815,7 +838,7 @@ struct VideoPlayerScreen: View {
             if isLandscape {
                 showLandscapeControlsTemporarily()
             } else {
-                manualFullscreenRequested = false
+                isPortraitFullscreen = false
                 resetLandscapeControls()
             }
         }
