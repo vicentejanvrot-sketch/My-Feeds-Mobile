@@ -69,7 +69,7 @@ Full privacy policy: [privacy-policy.md](privacy-policy.md)
 
 ## Support
 
-Questions, feedback, or issues? Contact us at **support@travelone.ca**.
+Questions, feedback, or issues? Contact us at **support@myfeeds.ca**.
 
 ---
 
@@ -84,6 +84,6 @@ This TestFlight build is a beta release. Here's what we'd love your feedback on:
 - Watch time statistics accuracy.
 - Overall app performance and stability.
 
-If something doesn't work as expected, please let us know at support@travelone.ca. Include what you were doing, what happened, and what you expected to happen.
+If something doesn't work as expected, please let us know at support@myfeeds.ca. Include what you were doing, what happened, and what you expected to happen.
 
 Thank you for testing My Feeds!
